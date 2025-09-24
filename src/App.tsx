@@ -1,13 +1,13 @@
 import React from 'react';
 import {
   ConfigProvider, Layout, Typography, Space, Select, DatePicker, Button,
-  Dropdown, Checkbox, Card, Table, Input, Divider
+  Dropdown, Checkbox, Card, Table, Input, Divider, Tooltip, Switch, Badge
 } from 'antd';
 import type { MenuProps } from 'antd';
-import { DownOutlined, UpOutlined } from '@ant-design/icons';
+import { DownOutlined, UpOutlined, CaretRightOutlined, CaretLeftOutlined } from '@ant-design/icons';
 import Chart from 'chart.js/auto';
-import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
+import type { Dayjs } from 'dayjs';
 
 const { Header, Content } = Layout;
 const { RangePicker } = DatePicker;
@@ -33,18 +33,39 @@ const appTheme = {
   }
 };
 
-const companyOptions = [
-  { value: 'Amazon', label: 'Amazon' },
-  { value: 'eBay', label: 'eBay' },
+type CompanyStatus = 'Active' | 'Pending' | 'Completed';
+const companyStatusColor: Record<CompanyStatus, string> = {
+  Active: '#00b746',
+  Pending: '#f3af00',
+  Completed: '#8B0000',
+};
+const baseCompanyOptions: { value: string; status: CompanyStatus; start: string; end: string }[] = [
+  { value: 'Amazon', status: 'Active', start: dayjs().subtract(20, 'day').format('YYYY-MM-DD'), end: dayjs().add(10, 'day').format('YYYY-MM-DD') },
+  { value: 'eBay', status: 'Pending', start: dayjs().add(5, 'day').format('YYYY-MM-DD'), end: dayjs().add(35, 'day').format('YYYY-MM-DD') },
+  { value: 'Shopify', status: 'Completed', start: dayjs().subtract(60, 'day').format('YYYY-MM-DD'), end: dayjs().subtract(30, 'day').format('YYYY-MM-DD') },
 ];
+const companyOptions = baseCompanyOptions.map(o => ({
+  value: o.value,
+  label: (
+    <span style={{ display: 'inline-flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+        <Tooltip title={o.status}>
+          <span style={{ width: 12, height: 12, background: companyStatusColor[o.status], borderRadius: 2, marginRight: 8, flex: '0 0 12px' }} />
+        </Tooltip>
+        <span>{o.value}</span>
+      </span>
+      <span style={{ color: '#999', fontSize: 12, marginLeft: 12 }}>
+        {`${dayjs(o.start).format('DD.MM.YY')} - ${dayjs(o.end).format('DD.MM.YY')}`}
+      </span>
+    </span>
+  )
+}));
 const bloggerOptions = [
   { value: 'Иван Иванов', label: 'Иван Иванов' },
   { value: 'Мария Смирнова', label: 'Мария Смирнова' },
 ];
-const asinOptions = [
-  { value: 'B00123456', label: 'B00123456' },
-  { value: 'C00987654', label: 'C00987654' },
-];
+// asinOptions will be derived later after detailsRowsBase is declared
+let asinOptions: { value: string; label: string }[] = [];
 const linkOptions = [
   { value: 'https://youtube.com/watch?v=abc123', label: 'https://youtube.com/watch?v=abc123' },
   { value: 'https://instagram.com/p/xyz789', label: 'https://instagram.com/p/xyz789' },
@@ -53,8 +74,8 @@ const linkOptions = [
   { value: 'https://youtube.com/shorts/def456', label: 'https://youtube.com/shorts/def456' },
 ];
 
-const prevM = { Spend:1774.18, Clicks:3249, Orders:120, Sales:8065.07, Conversion:'12%', 'Commision Rate':'5%', Profit:3200 } as const;
-const curM  = { Spend:3372.42, Clicks:6200, Orders:100, Sales:15450.24, Conversion:'15%', 'Commision Rate':'7%', Profit:5400 } as const;
+const prevM = { Spend:1774.18, Clicks:3249, Orders:120, Sales:8065.07, Conversion:'12%', 'Commision Rate':'5%', Profit:3200, 'Promotional Costs': 650.00 } as const;
+const curM  = { Spend:3372.42, Clicks:6200, Orders:100, Sales:15450.24, Conversion:'15%', 'Commision Rate':'7%', Profit:5400, 'Promotional Costs': 980.00 } as const;
 const allMetrics = Object.keys(prevM) as Array<keyof typeof prevM>;
 
 function MetricCard({ title, value, prev }: { title: string; value: number|string; prev: number|string }) {
@@ -220,7 +241,7 @@ function ChartCard({ dateRange, collapsed }: { dateRange: [Dayjs, Dayjs] | null;
 function SecondaryChart({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const chartRef = React.useRef<Chart | null>(null);
-  const [checks, setChecks] = React.useState<{ clicks: boolean; orders: boolean; conversion: boolean; none: boolean }>({ clicks: true, orders: true, conversion: false, none: false });
+  const [checks, setChecks] = React.useState<{ clicks: boolean; orders: boolean; conversion: boolean; none: boolean }>({ clicks: true, orders: true, conversion: true, none: false });
   const [dropOpen, setDropOpen] = React.useState(false);
 
   const buildLabels = React.useCallback((): string[] => {
@@ -415,6 +436,8 @@ type Row = {
   key: string;
   img: string;
   product: string;
+  asin: string;
+  blogger?: string;
   orders: number;
   clicks: number;
   conversion: number;
@@ -425,18 +448,43 @@ type Row = {
   profit: number;
 };
 
-function DetailsTable() {
+const extractAsin = (product: string) => product.split(' ')[0];
+
+const detailsRowsBase: Row[] = [
+  { key:'1', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQtJr-cqOx04hXoXD06NMfsGlB-UFxHD3rAaA&s', product:'B0AAA11111 (SKU: HVM-70001) Stainless Steel Toilet Brush and Holder – Matte Black', asin: 'B0AAA11111', blogger:'Иван Иванов', orders:0, clicks:0, conversion:0, rate:7, margin:15, spend:0, sales:0, profit:0 },
+  { key:'2', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTpbMMyNkEN6q0bscf53nWBb3F3pXAJr11NfQ&s', product:'B0BBB22222 (SKU: HVM-70002) 720° Rotating Faucet Aerator – Splash-proof Smart Filter', asin: 'B0BBB22222', blogger:'Мария Смирнова', orders:1, clicks:15, conversion:6.7, rate:7, margin:53, spend:0, sales:12.64, profit:6.72 },
+  { key:'3', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQKprCjvW5CbqPRI9Qt8DIHJVztC4FlWkoSfg&s', product:'B0CCC33333 (SKU: HVM-70003) Gold Toilet Brush and Holder – Brushed Stainless Steel', asin: 'B0CCC33333', blogger:'Иван Иванов', orders:2, clicks:30, conversion:6.7, rate:7, margin:53, spend:0, sales:25.28, profit:13.44 },
+  { key:'4', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSJLGQ3xRxuRsEnru3EiWdylLg7GVaEESV8Yg&s', product:'B0DDD44444 (SKU: HVM-70004) Gold Toilet Brush and Holder – Deluxe Edition', asin: 'B0DDD44444', blogger:'Мария Смирнова', orders:1, clicks:15, conversion:6.7, rate:7, margin:53, spend:0, sales:12.64, profit:6.72 },
+];
+
+// Initialize asinOptions now that detailsRowsBase is known
+asinOptions = Array.from(new Set(detailsRowsBase.map(r => r.asin))).map(a => ({ value: a, label: a }));
+
+function DetailsTable({ filters }: { filters: { asin?: string; blogger?: string } }) {
+  const [showBlogger, setShowBlogger] = React.useState(false);
+
   const columns = [
     {
-      title: 'Product',
-      dataIndex: 'product',
-      key: 'product',
-      sorter: (a: Row, b: Row) => a.product.localeCompare(b.product),
+      title: (
+        <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+          <Switch size="small" checked={showBlogger} onChange={setShowBlogger} />
+          <span style={{ marginLeft: 8 }}>{showBlogger ? 'Blogger' : 'Product'}</span>
+        </span>
+      ),
+      key: 'productOrBlogger',
+      sorter: (a: Row, b: Row) => {
+        if (showBlogger) return (a.blogger || '').localeCompare(b.blogger || '');
+        return a.product.localeCompare(b.product);
+      },
       render: (_: any, r: Row) => (
+        showBlogger ? (
+          <span style={{ fontSize: 14 }}>{r.blogger || ''}</span>
+        ) : (
         <span>
           <img src={r.img} style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4, marginRight: 8, verticalAlign: 'middle' }} />
           <span style={{ display: 'inline-block', verticalAlign: 'middle', fontSize: 14, lineHeight: 1.2 }}>{r.product}</span>
         </span>
+        )
       ),
     },
     { title: 'Orders', dataIndex: 'orders', key: 'orders', sorter: (a: Row, b: Row) => a.orders - b.orders },
@@ -449,14 +497,15 @@ function DetailsTable() {
     { title: 'Profit, $', dataIndex: 'profit', key: 'profit', sorter: (a: Row, b: Row) => a.profit - b.profit, render: (v: number) => v.toFixed(2) },
   ];
 
-  const data: Row[] = [
-    { key:'1', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQtJr-cqOx04hXoXD06NMfsGlB-UFxHD3rAaA&s', product:'BOOTCT7ZSP (SKU: HVM-62001) Black Toilet Brush and Holder Set – Scratch Resistant Black Toilet Bowl Brush and...', orders:0, clicks:0, conversion:0, rate:7, margin:15, spend:0, sales:0, profit:0 },
-    { key:'2', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTpbMMyNkEN6q0bscf53nWBb3F3pXAJr11NfQ&s', product:'B0CLRT7NVS (SKU: HVM-62003) 2Pcs Universal 720° Rotating Faucet – Splash-proof Smart Filter Faucet for Kitchen…', orders:1, clicks:15, conversion:6.7, rate:7, margin:53, spend:0, sales:12.64, profit:6.72 },
-    { key:'3', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQKprCjvW5CbqPRI9Qt8DIHJVztC4FlWkoSfg&s', product:'B0CLRT7NVS (SKU: HVM-62003) Gold Toilet Brush and Holder Set – Brushed Stainless Steel Gold Toilet Bowl Brush and...', orders:2, clicks:30, conversion:6.7, rate:7, margin:53, spend:0, sales:25.28, profit:13.44 },
-    { key:'4', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSJLGQ3xRxuRsEnru3EiWdylLg7GVaEESV8Yg&s', product:'B0CLRT7NVS (SKU: HVM-62003) Gold Toilet Brush and Holder Set – Brushed Stainless Steel Gold Toilet Bowl Brush and...', orders:1, clicks:15, conversion:6.7, rate:7, margin:53, spend:0, sales:12.64, profit:6.72 },
-  ];
+  const filtered = React.useMemo(() => {
+    return detailsRowsBase.filter(r => {
+      if (filters.asin && r.asin !== filters.asin) return false;
+      if (showBlogger && filters.blogger && r.blogger !== filters.blogger) return false;
+      return true;
+    });
+  }, [filters.asin, filters.blogger, showBlogger]);
 
-  return <Table columns={columns as any} dataSource={data} pagination={false} />;
+  return <Table columns={columns as any} dataSource={filtered} pagination={false} />;
 }
 
 export default function App() {
@@ -468,7 +517,7 @@ export default function App() {
   const [newPresetName, setNewPresetName] = React.useState('');
   const [presetsOpen, setPresetsOpen] = React.useState(false);
   const [settingsOpen, setSettingsOpen] = React.useState(false);
-  const [dateRange, setDateRange] = React.useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
+  const [dateRange, setDateRange] = React.useState<[Dayjs, Dayjs] | null>(null);
   const [showDetails, setShowDetails] = React.useState<boolean>(false);
   const [selectedCompany, setSelectedCompany] = React.useState<string | undefined>(undefined);
   const [selectedBlogger, setSelectedBlogger] = React.useState<string | undefined>(undefined);
@@ -531,17 +580,26 @@ export default function App() {
     <ConfigProvider theme={appTheme}>
       <Layout style={{ minHeight: '100vh' }}>
         <Header style={{ background: 'transparent', padding: 0 }}>
-          <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 12px' }}>
+          <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 12px' }}>
             <Typography.Title level={2} style={{ margin: '24px 0 20px' }}>Dashboard</Typography.Title>
           </div>
         </Header>
         <Content>
-          <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 12px' }}>
+          <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 12px' }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 15, marginBottom: 20, alignItems: 'center' }}>
-              <Select style={{ minWidth: 180 }} options={companyOptions} showSearch allowClear placeholder="Campaign" value={selectedCompany} onChange={(v) => setSelectedCompany(v)} />
+              <Select
+                style={{ minWidth: 180 }}
+                options={companyOptions}
+                showSearch
+                allowClear
+                placeholder="Campaign"
+                value={selectedCompany}
+                onChange={(v) => setSelectedCompany(v)}
+                filterOption={(input, option) => (String(option?.value || '')).toLowerCase().includes(input.toLowerCase())}
+              />
               <Select style={{ minWidth: 180 }} options={bloggerOptions} showSearch allowClear placeholder="Blogger" value={selectedBlogger} onChange={(v) => setSelectedBlogger(v)} />
               <Select style={{ minWidth: 180 }} options={asinOptions} showSearch allowClear placeholder="ASIN" value={selectedAsin} onChange={(v) => setSelectedAsin(v)} />
-              <Select style={{ minWidth: 260 }} options={linkOptions} showSearch allowClear placeholder="Content link" value={selectedLink} onChange={(v) => setSelectedLink(v)} />
+              {/* Content link select removed by request */}
               <RangePicker
                 format="DD.MM.YYYY"
                 presets={[
@@ -606,7 +664,7 @@ export default function App() {
 
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(250px,1fr))',
+              gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
               gap: 15,
               maxWidth: 1600,
               margin: '0 auto 24px',
@@ -619,7 +677,17 @@ export default function App() {
               ))}
             </div>
 
-            <ChartsBlock dateRange={dateRange} />
+            <div style={{ position: 'relative', paddingRight: 52 }}>
+              <ChartsBlock dateRange={dateRange} />
+              <SummaryToggle dateRange={dateRange} />
+              <SummaryPanel dateRange={dateRange} />
+            </div>
+
+            {showDetails && (
+              <div style={{ marginTop: 16 }}>
+                <DetailsTable filters={{ asin: selectedAsin, blogger: selectedBlogger }} />
+              </div>
+            )}
 
             <div style={{ marginTop: 16 }}>
               <ContentTableCard
@@ -627,12 +695,6 @@ export default function App() {
                 dateRange={dateRange}
               />
             </div>
-
-            {showDetails && (
-              <div style={{ marginTop: 16 }}>
-                <DetailsTable />
-              </div>
-            )}
           </div>
         </Content>
       </Layout>
@@ -698,6 +760,101 @@ function ContentTableCard({ filters, dateRange }: { filters: { company?: string;
         <Table columns={columns as any} dataSource={rows} pagination={false} />
       )}
     </Card>
+  );
+}
+function SummaryToggle({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
+  const [open, setOpen] = React.useState<boolean>(() => {
+    try { return JSON.parse(localStorage.getItem('summaryOpen') || 'false'); } catch { return false; }
+  });
+  React.useEffect(() => { localStorage.setItem('summaryOpen', JSON.stringify(open)); }, [open]);
+  React.useEffect(() => {
+    const onStorage = () => {
+      try { setOpen(JSON.parse(localStorage.getItem('summaryOpen') || 'false')); } catch {}
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+  const toggle = () => {
+    try { localStorage.setItem('summaryOpen', JSON.stringify(!open)); } catch {}
+    window.dispatchEvent(new StorageEvent('storage', { key: 'summaryOpen', newValue: JSON.stringify(!open) } as any));
+  };
+  return (
+    <Button
+      type="text"
+      onClick={toggle}
+      style={{ position: 'absolute', top: 8, right: open ? 364 : 4, zIndex: 50, border: '1px solid #D9D9D9', borderRadius: 16, background: '#ffffff', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}
+      aria-label="Toggle summary"
+    >
+      {open ? <CaretRightOutlined /> : <CaretLeftOutlined />}
+    </Button>
+  );
+}
+
+function SummaryPanel({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
+  const [open, setOpen] = React.useState<boolean>(() => {
+    try { return JSON.parse(localStorage.getItem('summaryOpen') || 'false'); } catch { return false; }
+  });
+  React.useEffect(() => {
+    const onStorage = () => {
+      try { setOpen(JSON.parse(localStorage.getItem('summaryOpen') || 'false')); } catch {}
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  const periodText = React.useMemo(() => {
+    if (!dateRange) return 'Период не выбран';
+    const [s, e] = dateRange;
+    return `${s.format('DD.MM.YYYY')} — ${e.format('DD.MM.YYYY')}`;
+  }, [dateRange]);
+
+  const fmtCurrency = (v: number) => `$${v.toLocaleString('ru-RU', { minimumFractionDigits: 2 })}`;
+  const fmtPercent = (v: number) => `${v.toFixed(1)}%`;
+
+  // Mock calculations based on existing demo totals
+  const sales = curM.Sales;
+  const units = curM.Orders; // using Orders as Units for demo
+  const clicks = curM.Clicks;
+  const conversion = parseFloat(String(curM.Conversion).replace('%', ''));
+  const promoCost = (curM as any)['Promotional Costs'] ?? Math.round(curM.Spend * 0.25 * 100) / 100;
+  const promoPerc = sales ? (promoCost / sales) * 100 : 0;
+  const commissionPerc = parseFloat(String((curM as any)['Commision Rate']).replace('%', '')) || 7;
+  const commissionUsd = sales * (commissionPerc / 100);
+  const costPerc = 30; // demo
+  const costUsd = sales * (costPerc / 100);
+  const holdsPerc = 5; // demo
+  const holdsUsd = sales * (holdsPerc / 100);
+  const profit = curM.Profit;
+
+  return (
+    <div style={{ position: 'absolute', top: 0, right: 0, width: open ? 360 : 0, overflow: 'hidden', transition: 'width 0.2s ease', zIndex: 20 }}>
+      <Card bodyStyle={{ padding: open ? 16 : 0, display: open ? 'block' : 'none' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <Typography.Text strong>Summary</Typography.Text>
+          <Badge color="#007bff" text={<span style={{ color: '#666' }}>{periodText}</span>} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', rowGap: 6 }}>
+          <RowLine label="Sales" value={`${fmtCurrency(sales)}`} />
+          <RowLine label="Units" value={`${units}`} />
+          <RowLine label="Promotional costs" value={`${fmtCurrency(promoCost)} / ${fmtPercent(promoPerc)}`} />
+          <RowLine label="Comission rate" value={`${fmtCurrency(commissionUsd)} / ${fmtPercent(commissionPerc)}`} />
+          <RowLine label="Cost price" value={`${fmtCurrency(costUsd)} / ${fmtPercent(costPerc)}`} />
+          <RowLine label="Amazon Holds" value={`${fmtCurrency(holdsUsd)} / ${fmtPercent(holdsPerc)}`} />
+          <RowLine label="Profit" value={`${fmtCurrency(profit)}`} />
+          <RowLine label="Clicks" value={`${clicks}`} />
+          <RowLine label="Conversion" value={`${fmtPercent(conversion)}`} />
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function RowLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+      <span style={{ color: '#666' }}>{label}</span>
+      <span style={{ fontWeight: 500 }}>{value}</span>
+    </div>
   );
 }
 
