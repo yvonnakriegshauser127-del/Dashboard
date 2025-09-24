@@ -128,9 +128,38 @@ function ChartCard({ dateRange, collapsed }: { dateRange: [Dayjs, Dayjs] | null;
     const yLeftId = 'yLeftTop';
     const yRightId = 'yRightTop';
     const datasets: any[] = [];
-    if (checks.spend) datasets.push({ label: 'Spend', data: arrN(curM.Spend), yAxisID: bothUnits ? yLeftId : yLeftId, borderColor: '#1f77b4', backgroundColor: '#1f77b433', fill: false, tension: 0.3 });
-    if (checks.profit) datasets.push({ label: 'Profit', data: arrN(curM.Profit), yAxisID: bothUnits ? yLeftId : yLeftId, borderColor: '#ff7f0e', backgroundColor: '#ff7f0e33', fill: false, tension: 0.3 });
-    if (checks.orders) datasets.push({ label: 'Orders', data: arrN(curM.Orders), yAxisID: bothUnits ? yRightId : yLeftId, borderColor: '#33a02c', backgroundColor: '#33a02c33', fill: false, tension: 0.3 });
+    const addPair = (name: string, value: number, color: string, yAxisID: string) => {
+      const data = arrN(value);
+      // Bar layer (hidden from legend)
+      datasets.push({
+        label: `${name} bars`,
+        data,
+        yAxisID,
+        type: 'bar',
+        backgroundColor: color + '55',
+        borderColor: color,
+        maxBarThickness: 25,
+        categoryPercentage: 0.6,
+        barPercentage: 0.8,
+        isBar: true,
+        order: 1,
+      });
+      // Line overlay
+      datasets.push({
+        label: name,
+        data,
+        yAxisID,
+        type: 'line',
+        borderColor: color,
+        backgroundColor: color + '33',
+        fill: false,
+        tension: 0.3,
+        order: 2,
+      });
+    };
+    if (checks.spend) addPair('Spend', curM.Spend, '#1f77b4', bothUnits ? yLeftId : yLeftId);
+    if (checks.profit) addPair('Profit', curM.Profit, '#ff7f0e', bothUnits ? yLeftId : yLeftId);
+    if (checks.orders) addPair('Orders', curM.Orders, '#33a02c', bothUnits ? yRightId : yLeftId);
     return { datasets, moneySelected, countSelected, bothUnits, yLeftId, yRightId };
   }, [checks]);
 
@@ -148,7 +177,12 @@ function ChartCard({ dateRange, collapsed }: { dateRange: [Dayjs, Dayjs] | null;
         responsive: true,
         plugins: {
           legend: {
-            labels: { filter: () => true },
+            labels: {
+              filter: (item: any, chart: any) => {
+                const ds = chart?.data?.datasets?.[item.datasetIndex];
+                return !ds?.isBar;
+              }
+            },
           },
         },
         scales: {
@@ -272,9 +306,13 @@ function SecondaryChart({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
     const yRightId = 'yRight2';
 
     const datasets: any[] = [];
-    if (checks.clicks) datasets.push({ label: 'Clicks', data: arrN(200), yAxisID: hasPercent && hasCount ? yLeftId : yLeftId, borderColor: '#1f77b4', backgroundColor: '#1f77b433', fill: false, tension: 0.3 });
-    if (checks.orders) datasets.push({ label: 'Orders', data: arrN(50), yAxisID: hasPercent && hasCount ? yLeftId : yLeftId, borderColor: '#33a02c', backgroundColor: '#33a02c33', fill: false, tension: 0.3 });
-    if (checks.conversion) datasets.push({ label: 'Conversion', data: arrPerc(5), yAxisID: hasPercent && hasCount ? yRightId : yLeftId, borderColor: '#ff7f0e', backgroundColor: '#ff7f0e33', fill: false, tension: 0.3 });
+    const addPair = (name: string, data: number[], color: string, yAxisID: string) => {
+      datasets.push({ label: `${name} bars`, data, yAxisID, type: 'bar', backgroundColor: color + '55', borderColor: color, isBar: true, order: 1, maxBarThickness: 25, categoryPercentage: 0.6, barPercentage: 0.8 });
+      datasets.push({ label: name, data, yAxisID, type: 'line', borderColor: color, backgroundColor: color + '33', fill: false, tension: 0.3, order: 2 });
+    };
+    if (checks.clicks) addPair('Clicks', arrN(200), '#1f77b4', hasPercent && hasCount ? yLeftId : yLeftId);
+    if (checks.orders) addPair('Orders', arrN(50), '#33a02c', hasPercent && hasCount ? yLeftId : yLeftId);
+    if (checks.conversion) addPair('Conversion', arrPerc(5), '#ff7f0e', hasPercent && hasCount ? yRightId : yLeftId);
 
     return { datasets, hasPercent, hasCount, yLeftId, yRightId };
   }, [checks]);
@@ -292,8 +330,9 @@ function SecondaryChart({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
         plugins: {
           legend: {
             labels: {
-              filter: (legendItem) => {
-                return true; // we only add selected datasets
+              filter: (item: any, chart: any) => {
+                const ds = chart?.data?.datasets?.[item.datasetIndex];
+                return !ds?.isBar;
               },
             },
           },
