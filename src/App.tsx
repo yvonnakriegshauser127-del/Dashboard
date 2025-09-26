@@ -1,13 +1,25 @@
 import React from 'react';
 import {
   ConfigProvider, Layout, Typography, Space, Select, DatePicker, Button,
-  Dropdown, Checkbox, Card, Table, Input, Divider, Tooltip, Switch, Badge
+  Dropdown, Checkbox, Card, Input, Divider, Tooltip, Badge, Radio
 } from 'antd';
+import { AgGridReact } from 'ag-grid-react';
+import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
+import 'ag-grid-community/styles/ag-grid.css';
+import 'ag-grid-community/styles/ag-theme-alpine.css';
 import type { MenuProps } from 'antd';
-import { DownOutlined, UpOutlined, CaretRightOutlined, CaretLeftOutlined } from '@ant-design/icons';
+import { DownOutlined, UpOutlined, InfoCircleOutlined, LeftCircleOutlined, RightCircleOutlined, SettingOutlined, DeleteOutlined, SaveOutlined, PlusCircleOutlined } from '@ant-design/icons';
 import Chart from 'chart.js/auto';
+// @ts-ignore
+import { CrosshairPlugin } from 'chartjs-plugin-crosshair';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
+
+// Register AG Grid modules
+ModuleRegistry.registerModules([AllCommunityModule]);
+
+// Register Chart.js plugins
+Chart.register(CrosshairPlugin);
 
 const { Header, Content } = Layout;
 const { RangePicker } = DatePicker;
@@ -54,9 +66,9 @@ const companyOptions = baseCompanyOptions.map(o => ({
         </Tooltip>
         <span>{o.value}</span>
       </span>
-      <span style={{ color: '#999', fontSize: 12, marginLeft: 12 }}>
-        {`${dayjs(o.start).format('DD.MM.YY')} - ${dayjs(o.end).format('DD.MM.YY')}`}
-      </span>
+      <Tooltip title={`${dayjs(o.start).format('DD.MM.YY')} - ${dayjs(o.end).format('DD.MM.YY')}`}>
+        <InfoCircleOutlined style={{ color: '#999', fontSize: 14, marginLeft: 8 }} />
+      </Tooltip>
     </span>
   )
 }));
@@ -121,15 +133,27 @@ function ChartCard({ dateRange, collapsed }: { dateRange: [Dayjs, Dayjs] | null;
   }, [dateRange]);
 
   const buildDatasets = React.useCallback((labels: string[]) => {
-    const arrN = (total: number) => Array(labels.length).fill(total / Math.max(labels.length, 1));
+    const generateRealisticData = (baseValue: number, volatility: number = 0.15) => {
+      return labels.map((_, index) => {
+        // Add some realistic variation with trend
+        const trend = Math.sin(index / labels.length * Math.PI * 2) * 0.1; // Seasonal trend
+        const random = (Math.random() - 0.5) * volatility; // Random variation
+        const dayOfWeek = index % 7; // Weekend effect
+        const weekendEffect = (dayOfWeek === 0 || dayOfWeek === 6) ? -0.1 : 0.05; // Lower on weekends
+        
+        return Math.max(0, baseValue * (1 + trend + random + weekendEffect));
+      });
+    };
+
     const moneySelected = checks.spend || checks.profit;
     const countSelected = checks.orders;
     const bothUnits = moneySelected && countSelected;
     const yLeftId = 'yLeftTop';
     const yRightId = 'yRightTop';
     const datasets: any[] = [];
-    const addPair = (name: string, value: number, color: string, yAxisID: string) => {
-      const data = arrN(value);
+    
+    const addPair = (name: string, baseValue: number, color: string, yAxisID: string, volatility: number = 0.15) => {
+      const data = generateRealisticData(baseValue, volatility);
       // Bar layer (hidden from legend)
       datasets.push({
         label: `${name} bars`,
@@ -157,9 +181,10 @@ function ChartCard({ dateRange, collapsed }: { dateRange: [Dayjs, Dayjs] | null;
         order: 2,
       });
     };
-    if (checks.spend) addPair('Spend', curM.Spend, '#1f77b4', bothUnits ? yLeftId : yLeftId);
-    if (checks.profit) addPair('Profit', curM.Profit, '#ff7f0e', bothUnits ? yLeftId : yLeftId);
-    if (checks.orders) addPair('Orders', curM.Orders, '#33a02c', bothUnits ? yRightId : yLeftId);
+    
+    if (checks.spend) addPair('Spend', curM.Spend, '#1f77b4', bothUnits ? yLeftId : yLeftId, 0.2);
+    if (checks.profit) addPair('Profit', curM.Profit, '#ff7f0e', bothUnits ? yLeftId : yLeftId, 0.25);
+    if (checks.orders) addPair('Orders', curM.Orders, '#33a02c', bothUnits ? yRightId : yLeftId, 0.3);
     return { datasets, moneySelected, countSelected, bothUnits, yLeftId, yRightId };
   }, [checks]);
 
@@ -175,20 +200,69 @@ function ChartCard({ dateRange, collapsed }: { dateRange: [Dayjs, Dayjs] | null;
       data: { labels, datasets },
       options: {
         responsive: true,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
         plugins: {
           legend: {
             labels: {
-              filter: (item: any, chart: any) => {
-                const ds = chart?.data?.datasets?.[item.datasetIndex];
-                return !ds?.isBar;
+              filter: (item: any) => {
+                return !item.text?.includes(' bars');
               }
             },
           },
+          tooltip: {
+            mode: 'index',
+            intersect: false,
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            titleColor: 'white',
+            bodyColor: 'white',
+            borderColor: 'rgba(255, 255, 255, 0.2)',
+            borderWidth: 1,
+            cornerRadius: 8,
+            displayColors: true,
+            filter: function(tooltipItem: any) {
+              return !tooltipItem.dataset.label?.includes(' bars');
+            },
+            callbacks: {
+              title: function(context: any) {
+                return context[0].label;
+              },
+              label: function(context: any) {
+                const label = context.dataset.label || '';
+                if (label.includes(' bars')) return undefined; // Hide bar dataset tooltips
+                let value = context.parsed.y;
+                if (label === 'Spend' || label === 'Profit') {
+                  return `${label}: $${value.toLocaleString('ru-RU', { minimumFractionDigits: 2 })}`;
+                } else {
+                  return `${label}: ${value.toLocaleString('ru-RU')}`;
+                }
+              }
+            }
+          },
+          // @ts-ignore
+          crosshair: {
+            line: {
+              color: '#666',
+              width: 1,
+              dashPattern: [5, 5]
+            },
+            sync: {
+              enabled: true
+            },
+            zoom: {
+              enabled: false
+            }
+          }
         },
         scales: {
           [yLeftId]:  { position: 'left',  display: moneySelected || (!moneySelected && !countSelected), ticks: { callback: (val: any) => `$${(+val).toFixed(2)}` } },
           [yRightId]: { position: 'right', display: bothUnits, ticks: { callback: (val: any) => `${(+val).toFixed(0)}` } },
         },
+        onHover: (event: any, activeElements: any) => {
+          ctx.canvas.style.cursor = activeElements.length > 0 ? 'pointer' : 'default';
+        }
       },
     });
     return () => { chartRef.current?.destroy(); };
@@ -253,7 +327,7 @@ function ChartCard({ dateRange, collapsed }: { dateRange: [Dayjs, Dayjs] | null;
     <Card
       title={collapsed ? "Charts" : "Campaign Performance"}
       style={{ maxWidth: 1600, margin: '0 auto' }}
-      bodyStyle={collapsed ? { display: 'none', padding: 0 } : undefined}
+      styles={{ body: collapsed ? { display: 'none', padding: 0 } : undefined }}
       extra={
         <Button type="text" onClick={toggleCollapsed}>
           {collapsed ? <DownOutlined /> : <UpOutlined />}
@@ -292,8 +366,18 @@ function SecondaryChart({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
   }, [dateRange]);
 
   const buildDatasets = React.useCallback((labels: string[]) => {
-    const arrN = (base: number) => Array(labels.length).fill(0).map((_, i) => Math.max(0, Math.round(base + (i - labels.length / 2) * (base * 0.05))));
-    const arrPerc = (base: number) => Array(labels.length).fill(0).map((_, i) => Math.max(0, +(base + (i - labels.length / 2) * 0.1).toFixed(1)));
+    const generateRealisticData = (baseValue: number, volatility: number = 0.15, isPercentage: boolean = false) => {
+      return labels.map((_, index) => {
+        // Add some realistic variation with trend
+        const trend = Math.sin(index / labels.length * Math.PI * 2) * 0.1; // Seasonal trend
+        const random = (Math.random() - 0.5) * volatility; // Random variation
+        const dayOfWeek = index % 7; // Weekend effect
+        const weekendEffect = (dayOfWeek === 0 || dayOfWeek === 6) ? -0.1 : 0.05; // Lower on weekends
+        
+        const value = Math.max(0, baseValue * (1 + trend + random + weekendEffect));
+        return isPercentage ? Math.round(value * 10) / 10 : Math.round(value);
+      });
+    };
 
     const selectedUnits: ('count' | 'percent')[] = [];
     if (checks.clicks) selectedUnits.push('count');
@@ -306,13 +390,37 @@ function SecondaryChart({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
     const yRightId = 'yRight2';
 
     const datasets: any[] = [];
-    const addPair = (name: string, data: number[], color: string, yAxisID: string) => {
-      datasets.push({ label: `${name} bars`, data, yAxisID, type: 'bar', backgroundColor: color + '55', borderColor: color, isBar: true, order: 1, maxBarThickness: 25, categoryPercentage: 0.6, barPercentage: 0.8 });
-      datasets.push({ label: name, data, yAxisID, type: 'line', borderColor: color, backgroundColor: color + '33', fill: false, tension: 0.3, order: 2 });
+    const addPair = (name: string, baseValue: number, color: string, yAxisID: string, volatility: number = 0.15, isPercentage: boolean = false) => {
+      const data = generateRealisticData(baseValue, volatility, isPercentage);
+      datasets.push({ 
+        label: `${name} bars`, 
+        data, 
+        yAxisID, 
+        type: 'bar', 
+        backgroundColor: color + '55', 
+        borderColor: color, 
+        isBar: true, 
+        order: 1, 
+        maxBarThickness: 25, 
+        categoryPercentage: 0.6, 
+        barPercentage: 0.8 
+      });
+      datasets.push({ 
+        label: name, 
+        data, 
+        yAxisID, 
+        type: 'line', 
+        borderColor: color, 
+        backgroundColor: color + '33', 
+        fill: false, 
+        tension: 0.3, 
+        order: 2 
+      });
     };
-    if (checks.clicks) addPair('Clicks', arrN(200), '#1f77b4', hasPercent && hasCount ? yLeftId : yLeftId);
-    if (checks.orders) addPair('Orders', arrN(50), '#33a02c', hasPercent && hasCount ? yLeftId : yLeftId);
-    if (checks.conversion) addPair('Conversion', arrPerc(5), '#ff7f0e', hasPercent && hasCount ? yRightId : yLeftId);
+    
+    if (checks.clicks) addPair('Clicks', 200, '#1f77b4', hasPercent && hasCount ? yLeftId : yLeftId, 0.2);
+    if (checks.orders) addPair('Orders', 50, '#33a02c', hasPercent && hasCount ? yLeftId : yLeftId, 0.3);
+    if (checks.conversion) addPair('Conversion', 5, '#ff7f0e', hasPercent && hasCount ? yRightId : yLeftId, 0.2, true);
 
     return { datasets, hasPercent, hasCount, yLeftId, yRightId };
   }, [checks]);
@@ -327,20 +435,69 @@ function SecondaryChart({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
       data: { labels, datasets },
       options: {
         responsive: true,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
         plugins: {
           legend: {
             labels: {
-              filter: (item: any, chart: any) => {
-                const ds = chart?.data?.datasets?.[item.datasetIndex];
-                return !ds?.isBar;
+              filter: (item: any) => {
+                return !item.text?.includes(' bars');
               },
             },
           },
+          tooltip: {
+            mode: 'index',
+            intersect: false,
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            titleColor: 'white',
+            bodyColor: 'white',
+            borderColor: 'rgba(255, 255, 255, 0.2)',
+            borderWidth: 1,
+            cornerRadius: 8,
+            displayColors: true,
+            filter: function(tooltipItem: any) {
+              return !tooltipItem.dataset.label?.includes(' bars');
+            },
+            callbacks: {
+              title: function(context: any) {
+                return context[0].label;
+              },
+              label: function(context: any) {
+                const label = context.dataset.label || '';
+                if (label.includes(' bars')) return undefined; // Hide bar dataset tooltips
+                let value = context.parsed.y;
+                if (label === 'Conversion') {
+                  return `${label}: ${value.toFixed(1)}%`;
+                } else {
+                  return `${label}: ${value.toLocaleString('ru-RU')}`;
+                }
+              }
+            }
+          },
+          // @ts-ignore
+          crosshair: {
+            line: {
+              color: '#666',
+              width: 1,
+              dashPattern: [5, 5]
+            },
+            sync: {
+              enabled: true
+            },
+            zoom: {
+              enabled: false
+            }
+          }
         },
         scales: {
           [yLeftId]: { position: 'left', display: hasCount || (!hasCount && !hasPercent), ticks: { callback: (val: any) => `${(+val).toFixed(0)}` } },
           [yRightId]: { position: 'right', display: hasPercent && hasCount, ticks: { callback: (val: any) => `${(+val).toFixed(1)}%` } },
         },
+        onHover: (event: any, activeElements: any) => {
+          ctx.canvas.style.cursor = activeElements.length > 0 ? 'pointer' : 'default';
+        }
       },
     });
     return () => { chartRef.current?.destroy(); };
@@ -438,6 +595,308 @@ function SecondaryChart({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
   );
 }
 
+function UnifiedChart({ 
+  dateRange, 
+  collapsed, 
+  chartId, 
+  initialChecks,
+  onDelete 
+}: { 
+  dateRange: [Dayjs, Dayjs] | null; 
+  collapsed: boolean;
+  chartId: string;
+  initialChecks?: { 
+    spend: boolean; 
+    profit: boolean; 
+    orders: boolean; 
+    clicks: boolean; 
+    conversion: boolean; 
+    none: boolean 
+  };
+  onDelete?: () => void;
+}) {
+  const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const chartRef = React.useRef<Chart | null>(null);
+  const [checks, setChecks] = React.useState<{ 
+    spend: boolean; 
+    profit: boolean; 
+    orders: boolean; 
+    clicks: boolean; 
+    conversion: boolean; 
+    none: boolean 
+  }>(initialChecks || { 
+    spend: true, 
+    profit: true, 
+    orders: true, 
+    clicks: true, 
+    conversion: true, 
+    none: false 
+  });
+  const [dropOpen, setDropOpen] = React.useState(false);
+
+  const buildLabels = React.useCallback((): string[] => {
+    if (!dateRange) return [dayjs().format('DD.MM')];
+    const [start, end] = dateRange;
+    const labels: string[] = [];
+    let d = start.startOf('day');
+    const last = end.endOf('day');
+    while (d.isBefore(last) || d.isSame(last, 'day')) {
+      labels.push(d.format('DD.MM'));
+      d = d.add(1, 'day');
+    }
+    return labels;
+  }, [dateRange]);
+
+  const buildDatasets = React.useCallback((labels: string[]) => {
+    const generateRealisticData = (baseValue: number, volatility: number = 0.15, isPercentage: boolean = false) => {
+      return labels.map((_, index) => {
+        // Add some realistic variation with trend
+        const trend = Math.sin(index / labels.length * Math.PI * 2) * 0.1; // Seasonal trend
+        const random = (Math.random() - 0.5) * volatility; // Random variation
+        const dayOfWeek = index % 7; // Weekend effect
+        const weekendEffect = (dayOfWeek === 0 || dayOfWeek === 6) ? -0.1 : 0.05; // Lower on weekends
+        
+        const value = Math.max(0, baseValue * (1 + trend + random + weekendEffect));
+        return isPercentage ? Math.round(value * 10) / 10 : Math.round(value);
+      });
+    };
+
+    const moneySelected = checks.spend || checks.profit;
+    const countSelected = checks.orders || checks.clicks;
+    const percentSelected = checks.conversion;
+    
+    const yLeftId = 'yLeftUnified';
+    const yRightId = 'yRightUnified';
+    const yPercentId = 'yPercentUnified';
+
+    const datasets: any[] = [];
+    
+    const addPair = (name: string, baseValue: number, color: string, yAxisID: string, volatility: number = 0.15, isPercentage: boolean = false) => {
+      const data = generateRealisticData(baseValue, volatility, isPercentage);
+      // Bar layer (hidden from legend)
+      datasets.push({
+        label: `${name} bars`,
+        data,
+        yAxisID,
+        type: 'bar',
+        backgroundColor: color + '55',
+        borderColor: color,
+        maxBarThickness: 25,
+        order: 2,
+      });
+      // Line layer
+      datasets.push({
+        label: name,
+        data,
+        yAxisID,
+        type: 'line',
+        borderColor: color,
+        backgroundColor: color + '20',
+        borderWidth: 2,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        fill: false,
+        tension: 0.1,
+        order: 1,
+      });
+    };
+
+    if (checks.spend) addPair('Spend', 500, '#1890ff', yLeftId, 0.2);
+    if (checks.profit) addPair('Profit', 200, '#52c41a', yLeftId, 0.25);
+    if (checks.orders) addPair('Orders', 15, '#fa8c16', yRightId, 0.3);
+    if (checks.clicks) addPair('Clicks', 100, '#722ed1', yRightId, 0.2);
+    if (checks.conversion) addPair('Conversion', 15, '#eb2f96', yPercentId, 0.15, true);
+
+    return datasets;
+  }, [checks]);
+
+  React.useEffect(() => {
+    if (!canvasRef.current) return;
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) return;
+
+    if (chartRef.current) {
+      chartRef.current.destroy();
+    }
+
+    const labels = buildLabels();
+    const datasets = buildDatasets(labels);
+
+    const moneySelected = checks.spend || checks.profit;
+    const countSelected = checks.orders || checks.clicks;
+    const percentSelected = checks.conversion;
+
+    chartRef.current = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              filter: function(item: any) {
+                return !item.text.includes(' bars');
+              }
+            }
+          },
+          tooltip: {
+            mode: 'index',
+            intersect: false,
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            titleColor: 'white',
+            bodyColor: 'white',
+            borderColor: 'rgba(255, 255, 255, 0.2)',
+            borderWidth: 1,
+            cornerRadius: 8,
+            displayColors: true,
+            filter: function(tooltipItem: any) {
+              return !tooltipItem.dataset.label?.includes(' bars');
+            },
+            callbacks: {
+              title: function(context: any) {
+                return context[0].label;
+              },
+              label: function(context: any) {
+                const label = context.dataset.label || '';
+                if (label.includes(' bars')) return undefined;
+                let value = context.parsed.y;
+                let formattedValue = value;
+                
+                if (label === 'Spend' || label === 'Profit') {
+                  formattedValue = `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                } else if (label === 'Conversion') {
+                  formattedValue = `${value}%`;
+                } else {
+                  formattedValue = value.toLocaleString('en-US');
+                }
+                
+                return `${label}: ${formattedValue}`;
+              }
+            }
+          },
+          // @ts-ignore
+          crosshair: {
+            line: {
+              color: '#666',
+              width: 1,
+              dashPattern: [5, 5]
+            },
+            sync: {
+              enabled: true
+            },
+            zoom: {
+              enabled: false
+            }
+          }
+        },
+        scales: {
+          yLeftUnified: {
+            type: 'linear',
+            display: moneySelected,
+            position: 'left',
+            title: {
+              display: true,
+              text: 'Spend & Profit ($)',
+              color: '#666'
+            },
+            grid: {
+              drawOnChartArea: true,
+            },
+          },
+          yRightUnified: {
+            type: 'linear',
+            display: countSelected,
+            position: 'right',
+            title: {
+              display: true,
+              text: 'Orders & Clicks',
+              color: '#666'
+            },
+            grid: {
+              drawOnChartArea: false,
+            },
+          },
+          yPercentUnified: {
+            type: 'linear',
+            display: percentSelected && !countSelected,
+            position: 'right',
+            title: {
+              display: true,
+              text: 'Conversion (%)',
+              color: '#666'
+            },
+            grid: {
+              drawOnChartArea: false,
+            },
+          },
+          x: {
+            display: true,
+            title: {
+              display: true,
+              text: 'Date',
+              color: '#666'
+            }
+          }
+        },
+        onHover: (event: any, activeElements: any) => {
+          if (event.native && event.native.target) {
+            if (activeElements.length > 0) {
+              event.native.target.style.cursor = 'crosshair';
+            } else {
+              event.native.target.style.cursor = 'default';
+            }
+          }
+        }
+      }
+    });
+  }, [buildLabels, buildDatasets, checks]);
+
+  const items: MenuProps['items'] = [
+    { key: 'spend', label: <Checkbox checked={checks.spend} onChange={e => setChecks(prev => ({ ...prev, spend: e.target.checked }))}>Spend</Checkbox> },
+    { key: 'profit', label: <Checkbox checked={checks.profit} onChange={e => setChecks(prev => ({ ...prev, profit: e.target.checked }))}>Profit</Checkbox> },
+    { key: 'orders', label: <Checkbox checked={checks.orders} onChange={e => setChecks(prev => ({ ...prev, orders: e.target.checked }))}>Orders</Checkbox> },
+    { key: 'clicks', label: <Checkbox checked={checks.clicks} onChange={e => setChecks(prev => ({ ...prev, clicks: e.target.checked }))}>Clicks</Checkbox> },
+    { key: 'conversion', label: <Checkbox checked={checks.conversion} onChange={e => setChecks(prev => ({ ...prev, conversion: e.target.checked }))}>Conversion</Checkbox> },
+    { key: 'none', label: <Checkbox checked={checks.none} onChange={e => setChecks(prev => ({ ...prev, none: e.target.checked, spend: false, profit: false, orders: false, clicks: false, conversion: false }))}>None</Checkbox> },
+  ];
+
+  if (collapsed) return null;
+
+  return (
+    <Card style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <Typography.Title level={4} style={{ margin: 0 }}>
+          {chartId === 'main' ? 'Unified Metrics Chart' : `Chart ${chartId}`}
+        </Typography.Title>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Dropdown menu={{ items }} open={dropOpen} onOpenChange={setDropOpen} trigger={['click']}>
+            <Button>⚙️ <DownOutlined /></Button>
+          </Dropdown>
+          {chartId !== 'main' && onDelete && (
+            <Button 
+              type="text" 
+              danger 
+              icon={<DeleteOutlined />}
+              onClick={onDelete}
+              title="Delete chart"
+            />
+          )}
+        </div>
+      </div>
+      <div style={{ height: 400, position: 'relative' }}>
+        <canvas ref={canvasRef} />
+      </div>
+    </Card>
+  );
+}
+
 function CollapseCharts() {
   const [collapsed, setCollapsed] = React.useState<boolean>(() => {
     try { return JSON.parse(localStorage.getItem('chartsCollapsed') || 'false'); } catch { return false; }
@@ -452,6 +911,30 @@ function ChartsBlock({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
   const [collapsed, setCollapsed] = React.useState<boolean>(() => {
     try { return JSON.parse(localStorage.getItem('chartsCollapsed') || 'false'); } catch { return false; }
   });
+  const [charts, setCharts] = React.useState<Array<{
+    id: string;
+    checks: { 
+      spend: boolean; 
+      profit: boolean; 
+      orders: boolean; 
+      clicks: boolean; 
+      conversion: boolean; 
+      none: boolean 
+    };
+  }>>([
+    {
+      id: 'main',
+      checks: { 
+        spend: true, 
+        profit: true, 
+        orders: true, 
+        clicks: true, 
+        conversion: true, 
+        none: false 
+      }
+    }
+  ]);
+
   React.useEffect(() => {
     const onStorage = () => {
       try { setCollapsed(JSON.parse(localStorage.getItem('chartsCollapsed') || 'false')); } catch {}
@@ -459,14 +942,54 @@ function ChartsBlock({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
+
+  const addChart = () => {
+    const newChartId = `chart-${Date.now()}`;
+    const mainChart = charts.find(chart => chart.id === 'main');
+    const newChart = {
+      id: newChartId,
+      checks: mainChart ? { ...mainChart.checks } : { 
+        spend: true, 
+        profit: true, 
+        orders: true, 
+        clicks: true, 
+        conversion: true, 
+        none: false 
+      }
+    };
+    setCharts(prev => [...prev, newChart]);
+  };
+
+  const deleteChart = (chartId: string) => {
+    if (chartId === 'main') return; // Нельзя удалить основной график
+    setCharts(prev => prev.filter(chart => chart.id !== chartId));
+  };
+
   return (
     <>
-      <ChartCard dateRange={dateRange} collapsed={collapsed} />
-      {!collapsed && (
-        <div style={{ marginTop: 16 }}>
-          <SecondaryChart dateRange={dateRange} />
+      {charts.map((chart, index) => (
+        <div key={chart.id}>
+          <UnifiedChart 
+            dateRange={dateRange} 
+            collapsed={collapsed} 
+            chartId={chart.id}
+            initialChecks={chart.checks}
+            onDelete={chart.id !== 'main' ? () => deleteChart(chart.id) : undefined}
+          />
+          {index === 0 && !collapsed && (
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+              <Button 
+                type="dashed" 
+                icon={<PlusCircleOutlined />}
+                onClick={addChart}
+                style={{ borderStyle: 'dashed', borderColor: '#d9d9d9' }}
+              >
+                Add Chart
+              </Button>
+            </div>
+          )}
         </div>
-      )}
+      ))}
     </>
   );
 }
@@ -485,66 +1008,645 @@ type Row = {
   spend: number;
   sales: number;
   profit: number;
+  promoCosts: number;
 };
 
 const extractAsin = (product: string) => product.split(' ')[0];
 
+// Function to extract product data
+const extractProductData = (product: string) => {
+  const asinMatch = product.match(/^(B[A-Z0-9]{9})/);
+  const asin = asinMatch ? asinMatch[1] : '';
+  
+  const skuMatch = product.match(/\(SKU:\s*([^)]+)\)/);
+  const sku = skuMatch ? skuMatch[1] : '';
+  
+  const nameMatch = product.match(/\)\s*(.+)$/);
+  const name = nameMatch ? nameMatch[1] : product;
+  
+  return { asin, sku, name };
+};
+
 const detailsRowsBase: Row[] = [
-  { key:'1', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQtJr-cqOx04hXoXD06NMfsGlB-UFxHD3rAaA&s', product:'B0AAA11111 (SKU: HVM-70001) Stainless Steel Toilet Brush and Holder – Matte Black', asin: 'B0AAA11111', blogger:'Иван Иванов', orders:0, clicks:0, conversion:0, rate:7, margin:15, spend:0, sales:0, profit:0 },
-  { key:'2', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTpbMMyNkEN6q0bscf53nWBb3F3pXAJr11NfQ&s', product:'B0BBB22222 (SKU: HVM-70002) 720° Rotating Faucet Aerator – Splash-proof Smart Filter', asin: 'B0BBB22222', blogger:'Мария Смирнова', orders:1, clicks:15, conversion:6.7, rate:7, margin:53, spend:0, sales:12.64, profit:6.72 },
-  { key:'3', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQKprCjvW5CbqPRI9Qt8DIHJVztC4FlWkoSfg&s', product:'B0CCC33333 (SKU: HVM-70003) Gold Toilet Brush and Holder – Brushed Stainless Steel', asin: 'B0CCC33333', blogger:'Иван Иванов', orders:2, clicks:30, conversion:6.7, rate:7, margin:53, spend:0, sales:25.28, profit:13.44 },
-  { key:'4', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSJLGQ3xRxuRsEnru3EiWdylLg7GVaEESV8Yg&s', product:'B0DDD44444 (SKU: HVM-70004) Gold Toilet Brush and Holder – Deluxe Edition', asin: 'B0DDD44444', blogger:'Мария Смирнова', orders:1, clicks:15, conversion:6.7, rate:7, margin:53, spend:0, sales:12.64, profit:6.72 },
+  { key:'1', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQtJr-cqOx04hXoXD06NMfsGlB-UFxHD3rAaA&s', product:'B0AAA11111 (SKU: HVM-70001) Stainless Steel Toilet Brush and Holder – Matte Black', asin: 'B0AAA11111', blogger:'Иван Иванов', orders:0, clicks:0, conversion:0, rate:7, margin:15, spend:0, sales:0, profit:0, promoCosts: 0 },
+  { key:'2', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTpbMMyNkEN6q0bscf53nWBb3F3pXAJr11NfQ&s', product:'B0BBB22222 (SKU: HVM-70002) 720° Rotating Faucet Aerator – Splash-proof Smart Filter', asin: 'B0BBB22222', blogger:'Мария Смирнова', orders:1, clicks:15, conversion:6.7, rate:7, margin:53, spend:0, sales:12.64, profit:6.72, promoCosts: 2.50 },
+  { key:'3', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQKprCjvW5CbqPRI9Qt8DIHJVztC4FlWkoSfg&s', product:'B0CCC33333 (SKU: HVM-70003) Gold Toilet Brush and Holder – Brushed Stainless Steel', asin: 'B0CCC33333', blogger:'Иван Иванов', orders:2, clicks:30, conversion:6.7, rate:7, margin:53, spend:0, sales:25.28, profit:13.44, promoCosts: 5.00 },
+  { key:'4', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSJLGQ3xRxuRsEnru3EiWdylLg7GVaEESV8Yg&s', product:'B0DDD44444 (SKU: HVM-70004) Gold Toilet Brush and Holder – Deluxe Edition', asin: 'B0DDD44444', blogger:'Мария Смирнова', orders:1, clicks:15, conversion:6.7, rate:7, margin:53, spend:0, sales:12.64, profit:6.72, promoCosts: 2.50 },
 ];
 
 // Initialize asinOptions now that detailsRowsBase is known
 asinOptions = Array.from(new Set(detailsRowsBase.map(r => r.asin))).map(a => ({ value: a, label: a }));
 
-function DetailsTable({ filters }: { filters: { asin?: string; blogger?: string } }) {
-  const [showBlogger, setShowBlogger] = React.useState(false);
+function TruncatedText({ text, style }: { text: string; style: React.CSSProperties }) {
+  const [isOverflowing, setIsOverflowing] = React.useState(false);
+  const textRef = React.useRef<HTMLSpanElement>(null);
 
-  const columns = [
+  React.useEffect(() => {
+    if (textRef.current) {
+      setIsOverflowing(textRef.current.scrollWidth > textRef.current.clientWidth);
+    }
+  }, [text]);
+
+  const content = (
+    <span ref={textRef} style={style}>
+      {text}
+    </span>
+  );
+
+  return isOverflowing ? (
+    <Tooltip title={text} placement="topLeft">
+      {content}
+    </Tooltip>
+  ) : content;
+}
+
+function ProductNameTooltip({ text, style }: { text: string; style: React.CSSProperties }) {
+  const [isOverflowing, setIsOverflowing] = React.useState(false);
+  const textRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (textRef.current) {
+      setIsOverflowing(textRef.current.scrollWidth > textRef.current.clientWidth);
+    }
+  }, [text]);
+
+  const defaultStyle: React.CSSProperties = {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    width: '100%',
+    ...style
+  };
+
+  const content = (
+    <div ref={textRef} style={defaultStyle}>
+      {text}
+    </div>
+  );
+
+  return isOverflowing ? (
+    <Tooltip title={text} placement="topLeft">
+      {content}
+    </Tooltip>
+  ) : content;
+}
+
+function TruncatedTextWithTooltip({ 
+  text, 
+  style 
+}: { 
+  text: string; 
+  style?: React.CSSProperties;
+}) {
+  const [isOverflowing, setIsOverflowing] = React.useState(false);
+  const textRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (textRef.current) {
+      setIsOverflowing(textRef.current.scrollWidth > textRef.current.clientWidth);
+    }
+  }, [text]);
+
+  const defaultStyle: React.CSSProperties = {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    width: '100%',
+    ...style
+  };
+
+  const content = (
+    <div ref={textRef} style={defaultStyle}>
+      {text}
+    </div>
+  );
+
+  return isOverflowing ? (
+    <Tooltip title={text} placement="topLeft">
+      {content}
+    </Tooltip>
+  ) : content;
+}
+
+function TruncatedLinkWithTooltip({ 
+  href, 
+  text, 
+  style 
+}: { 
+  href: string; 
+  text: string; 
+  style?: React.CSSProperties;
+}) {
+  const [isOverflowing, setIsOverflowing] = React.useState(false);
+  const linkRef = React.useRef<HTMLAnchorElement>(null);
+
+  React.useEffect(() => {
+    if (linkRef.current) {
+      setIsOverflowing(linkRef.current.scrollWidth > linkRef.current.clientWidth);
+    }
+  }, [text]);
+
+  const defaultStyle: React.CSSProperties = {
+    color: '#1890ff', 
+    textDecoration: 'none',
+    fontSize: '13px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    width: '100%',
+    display: 'block',
+    ...style
+  };
+
+  const linkElement = (
+    <a 
+      ref={linkRef}
+      href={href} 
+      target="_blank" 
+      rel="noreferrer"
+      style={defaultStyle}
+    >
+      {text}
+    </a>
+  );
+
+  return isOverflowing ? (
+    <Tooltip title={text} placement="topLeft">
+      {linkElement}
+    </Tooltip>
+  ) : linkElement;
+}
+
+function ColumnVisibilityControl({ 
+  columnDefs, 
+  onColumnVisibilityChange 
+}: { 
+  columnDefs: any[]; 
+  onColumnVisibilityChange: (colId: string, visible: boolean) => void;
+}) {
+  const [visibleColumns, setVisibleColumns] = React.useState<Set<string>>(
+    new Set(columnDefs.map(col => col.colId))
+  );
+  const [dropdownOpen, setDropdownOpen] = React.useState(false);
+
+  const handleColumnToggle = (colId: string, checked: boolean) => {
+    const newVisibleColumns = new Set(visibleColumns);
+    if (checked) {
+      newVisibleColumns.add(colId);
+    } else {
+      newVisibleColumns.delete(colId);
+    }
+    setVisibleColumns(newVisibleColumns);
+    onColumnVisibilityChange(colId, checked);
+  };
+
+  const menuItems: MenuProps['items'] = columnDefs.map(col => ({
+    key: col.colId,
+    label: (
+      <Checkbox
+        onClick={e => e.stopPropagation()}
+        checked={visibleColumns.has(col.colId)}
+        onChange={e => handleColumnToggle(col.colId, e.target.checked)}
+      >
+        {col.headerName}
+      </Checkbox>
+    ),
+  }));
+
+  return (
+    <Dropdown 
+      menu={{ items: menuItems }} 
+      open={dropdownOpen} 
+      onOpenChange={setDropdownOpen}
+      trigger={['click']}
+      placement="bottomLeft"
+    >
+      <Button 
+        type="text" 
+        icon={<SettingOutlined />}
+        style={{ 
+          position: 'absolute',
+          top: '8px',
+          left: '8px',
+          zIndex: 10,
+          background: 'rgba(255, 255, 255, 0.9)',
+          border: '1px solid #d9d9d9',
+          borderRadius: '4px'
+        }}
+        size="small"
+      />
+    </Dropdown>
+  );
+}
+
+function TablePresets({ 
+  tableId, 
+  onPresetChange,
+  onSavePreset
+}: { 
+  tableId: string; 
+  onPresetChange: (preset: any) => void;
+  onSavePreset: () => any;
+}) {
+  const [presets, setPresets] = React.useState<Record<string, any>>({});
+  const [selectedPreset, setSelectedPreset] = React.useState<string>('');
+  const [newPresetName, setNewPresetName] = React.useState('');
+  const [presetsOpen, setPresetsOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    const savedPresets = localStorage.getItem(`table-presets-${tableId}`);
+    if (savedPresets) {
+      setPresets(JSON.parse(savedPresets));
+    }
+  }, [tableId]);
+
+  const savePreset = () => {
+    if (!newPresetName.trim()) return;
+    
+    const currentSettings = onSavePreset();
+    if (!currentSettings) return;
+    
+    const newPresets = {
+      ...presets,
+      [newPresetName]: {
+        name: newPresetName,
+        ...currentSettings,
+        timestamp: Date.now()
+      }
+    };
+    
+    setPresets(newPresets);
+    localStorage.setItem(`table-presets-${tableId}`, JSON.stringify(newPresets));
+    setNewPresetName('');
+    setPresetsOpen(false);
+  };
+
+  const deletePreset = (presetName: string) => {
+    const newPresets = { ...presets };
+    delete newPresets[presetName];
+    setPresets(newPresets);
+    localStorage.setItem(`table-presets-${tableId}`, JSON.stringify(newPresets));
+    
+    if (selectedPreset === presetName) {
+      setSelectedPreset('');
+    }
+  };
+
+  const applyPreset = (presetName: string) => {
+    setSelectedPreset(presetName);
+    onPresetChange(presets[presetName]);
+    setPresetsOpen(false);
+  };
+
+  const resetToDefault = () => {
+    setSelectedPreset('');
+    onPresetChange(null); // Передаем null для сброса
+    setPresetsOpen(false);
+  };
+
+  const presetsArray = Object.values(presets);
+
+  return (
+    <Dropdown
+      open={presetsOpen}
+      onOpenChange={setPresetsOpen}
+      popupRender={() => (
+        <div style={{ padding: 8, width: 280, background: '#ffffff', boxShadow: '0 6px 16px rgba(0,0,0,0.15)', border: '1px solid #D9D9D9', borderRadius: 8 }}>
+          <Typography.Text strong>Пресеты таблицы</Typography.Text>
+          <div style={{ maxHeight: 220, overflowY: 'auto', marginTop: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 4px' }}>
+              <Button type="link" style={{ padding: 0 }} onClick={resetToDefault}>Сбросить</Button>
+            </div>
+            {presetsArray.length === 0 && <Typography.Text type="secondary">Нет пресетов</Typography.Text>}
+            {presetsArray.map((preset: any, idx: number) => (
+              <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 4px' }}>
+                <Button type="link" style={{ padding: 0 }} onClick={() => applyPreset(preset.name)}>{preset.name}</Button>
+                <Button size="small" danger onClick={() => deletePreset(preset.name)}>Удалить</Button>
+              </div>
+            ))}
+          </div>
+          <Divider style={{ margin: '8px 0' }} />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Input placeholder="Название нового пресета" value={newPresetName} onChange={e => setNewPresetName(e.target.value)} />
+            <Button onClick={savePreset}>+</Button>
+          </div>
+        </div>
+      )}
+    >
+      <Button>Presets <DownOutlined /></Button>
+    </Dropdown>
+  );
+}
+
+function DetailsTable({ filters }: { filters: { asin?: string; blogger?: string } }) {
+  const [viewMode, setViewMode] = React.useState<'product' | 'blogger'>('product');
+  const [columnVisibility, setColumnVisibility] = React.useState<Record<string, boolean>>({});
+  const [columnOrder, setColumnOrder] = React.useState<string[]>([]);
+  const [columnWidths, setColumnWidths] = React.useState<Record<string, number>>({});
+  const gridRef = React.useRef<AgGridReact>(null);
+
+  const handleColumnVisibilityChange = (colId: string, visible: boolean) => {
+    setColumnVisibility(prev => ({ ...prev, [colId]: visible }));
+    if (gridRef.current?.api) {
+      gridRef.current.api.setColumnsVisible([colId], visible);
+      gridRef.current.api.sizeColumnsToFit();
+    }
+  };
+
+  const saveCurrentSettings = () => {
+    if (!gridRef.current?.api) return;
+    
+    const columnState = gridRef.current.api.getColumnState();
+    const visibility: Record<string, boolean> = {};
+    const widths: Record<string, number> = {};
+    const order: string[] = [];
+    
+    // Получаем порядок колонок из текущего состояния
+    columnState.forEach(col => {
+      if (col.colId) {
+        visibility[col.colId] = !col.hide;
+        if (col.width) widths[col.colId] = col.width;
+        order.push(col.colId);
+      }
+    });
+    
+    // Если порядок не получен из columnState, используем columnDefs
+    if (order.length === 0) {
+      columnDefs.forEach((col: any) => {
+        if (col.colId) {
+          order.push(col.colId);
+        }
+      });
+    }
+    
+    return {
+      visibility,
+      widths,
+      order,
+      timestamp: Date.now()
+    };
+  };
+
+  const loadSettings = (settings: any) => {
+    if (!settings || !gridRef.current?.api) return;
+    
+    setColumnVisibility(settings.visibility || {});
+    setColumnWidths(settings.widths || {});
+    setColumnOrder(settings.order || []);
+    
+    // Применяем настройки к таблице
+    if (settings.visibility) {
+      Object.entries(settings.visibility).forEach(([colId, visible]) => {
+        gridRef.current?.api.setColumnsVisible([colId], visible as boolean);
+      });
+    }
+    
+    if (settings.widths) {
+      Object.entries(settings.widths).forEach(([colId, width]) => {
+        gridRef.current?.api.setColumnWidths([{ key: colId, newWidth: width as number }]);
+      });
+    }
+    
+    // Применяем порядок колонок
+    if (settings.order && settings.order.length > 0) {
+      try {
+        // Используем moveColumns для изменения порядка
+        const currentColumnState = gridRef.current.api.getColumnState();
+        const currentOrder = currentColumnState.map(col => col.colId).filter(Boolean);
+        
+        // Находим колонки, которые нужно переместить
+        settings.order.forEach((targetColId: string, targetIndex: number) => {
+          const currentIndex = currentOrder.indexOf(targetColId);
+          if (currentIndex !== -1 && currentIndex !== targetIndex) {
+            // Перемещаем колонку в нужную позицию
+            gridRef.current?.api.moveColumns([targetColId], targetIndex);
+          }
+        });
+      } catch (error) {
+        console.warn('Не удалось применить порядок колонок:', error);
+      }
+    }
+    
+    setTimeout(() => {
+      gridRef.current?.api.sizeColumnsToFit();
+    }, 100);
+  };
+
+  const handlePresetChange = (preset: any) => {
+    if (preset) {
+      loadSettings(preset);
+    } else {
+      // Сброс на дефолтные настройки
+      resetToDefaultSettings();
+    }
+  };
+
+  const resetToDefaultSettings = () => {
+    if (!gridRef.current?.api) return;
+    
+    // Сбрасываем состояния
+    setColumnVisibility({});
+    setColumnWidths({});
+    setColumnOrder([]);
+    
+    // Показываем все колонки
+    const allColumnIds = columnDefs.map((col: any) => col.colId).filter(Boolean);
+    gridRef.current.api.setColumnsVisible(allColumnIds, true);
+    
+    // Сбрасываем размеры колонок
+    gridRef.current.api.sizeColumnsToFit();
+  };
+
+  const columnDefs = [
     {
-      title: (
-        <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-          <Switch size="small" checked={showBlogger} onChange={setShowBlogger} />
-          <span style={{ marginLeft: 8 }}>{showBlogger ? 'Blogger' : 'Product'}</span>
-        </span>
-      ),
-      key: 'productOrBlogger',
-      sorter: (a: Row, b: Row) => {
-        if (showBlogger) return (a.blogger || '').localeCompare(b.blogger || '');
-        return a.product.localeCompare(b.product);
+      headerName: viewMode === 'blogger' ? 'Blogger' : 'Product',
+      field: viewMode === 'blogger' ? 'blogger' : 'product',
+      colId: 'productOrBlogger',
+      flex: 2,
+      minWidth: 300,
+      pinned: 'left',
+      sortable: true,
+      filter: true,
+      hide: columnVisibility['productOrBlogger'] === false,
+      cellRenderer: (params: any) => {
+        const r = params.data as Row;
+        if (viewMode === 'blogger') {
+          return (
+            <TruncatedTextWithTooltip 
+              text={r.blogger || ''}
+              style={{
+                fontSize: '14px',
+                color: '#262626'
+              }}
+            />
+          );
+        } else {
+          const { asin, sku, name } = extractProductData(r.product);
+          return (
+            <div style={{ 
+              display: 'flex',
+              flexDirection: 'column',
+              padding: '8px 0',
+              height: '100%',
+              minHeight: '80px'
+            }}>
+              {/* Верхняя строка - название продукта */}
+              <div style={{ marginBottom: '8px' }}>
+                <ProductNameTooltip 
+                  text={name}
+                  style={{
+                    fontWeight: 500,
+                    fontSize: 14,
+                    color: '#262626',
+                    lineHeight: '18px'
+                  }}
+                />
+              </div>
+              
+              {/* Средняя и нижняя строки с фото */}
+              <div style={{ 
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '8px',
+                flex: 1
+              }}>
+                {/* Фото продукта */}
+                <img 
+                  src={r.img} 
+                  style={{ 
+                    width: 40, 
+                    height: 40, 
+                    objectFit: 'cover', 
+                    borderRadius: 4,
+                    flexShrink: 0
+                  }} 
+                  alt="Product"
+                />
+                
+                {/* ASIN и SKU справа от фото */}
+                <div style={{ 
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  height: '40px',
+                  flex: 1
+                }}>
+                  {/* Средняя строка - ASIN */}
+                  <div style={{ 
+                    fontSize: 13, 
+                    color: '#595959',
+                    fontWeight: 500,
+                    lineHeight: '18px'
+                  }}>
+                    {asin}
+                  </div>
+                  
+                  {/* Нижняя строка - SKU */}
+                  <div style={{ 
+                    fontSize: 12, 
+                    color: '#8c8c8c',
+                    lineHeight: '18px'
+                  }}>
+                    SKU: {sku}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }
       },
-      render: (_: any, r: Row) => (
-        showBlogger ? (
-          <span style={{ fontSize: 14 }}>{r.blogger || ''}</span>
-        ) : (
-        <span>
-          <img src={r.img} style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4, marginRight: 8, verticalAlign: 'middle' }} />
-          <span style={{ display: 'inline-block', verticalAlign: 'middle', fontSize: 14, lineHeight: 1.2 }}>{r.product}</span>
-        </span>
-        )
-      ),
     },
-    { title: 'Orders', dataIndex: 'orders', key: 'orders', sorter: (a: Row, b: Row) => a.orders - b.orders },
-    { title: 'Clicks', dataIndex: 'clicks', key: 'clicks', sorter: (a: Row, b: Row) => a.clicks - b.clicks },
-    { title: 'Conversion, %', dataIndex: 'conversion', key: 'conversion', sorter: (a: Row, b: Row) => a.conversion - b.conversion, render: (v: number) => v },
-    { title: 'Comission Rate, %', dataIndex: 'rate', key: 'rate', sorter: (a: Row, b: Row) => a.rate - b.rate, render: (v: number) => v },
-    { title: 'Margin, %', dataIndex: 'margin', key: 'margin', sorter: (a: Row, b: Row) => a.margin - b.margin, render: (v: number) => v },
-    { title: 'Spend, $', dataIndex: 'spend', key: 'spend', sorter: (a: Row, b: Row) => a.spend - b.spend, render: (v: number) => v.toFixed(2) },
-    { title: 'Sales, $', dataIndex: 'sales', key: 'sales', sorter: (a: Row, b: Row) => a.sales - b.sales, render: (v: number) => v.toFixed(2) },
-    { title: 'Profit, $', dataIndex: 'profit', key: 'profit', sorter: (a: Row, b: Row) => a.profit - b.profit, render: (v: number) => v.toFixed(2) },
-  ];
+    { headerName: 'Orders', field: 'orders', colId: 'orders', flex: 1, minWidth: 80, sortable: true, filter: 'agNumberColumnFilter', hide: columnVisibility['orders'] === false },
+    { headerName: 'Clicks', field: 'clicks', colId: 'clicks', flex: 1, minWidth: 80, sortable: true, filter: 'agNumberColumnFilter', hide: columnVisibility['clicks'] === false },
+    { headerName: 'Conversion, %', field: 'conversion', colId: 'conversion', flex: 1, minWidth: 100, sortable: true, filter: 'agNumberColumnFilter', hide: columnVisibility['conversion'] === false },
+    { headerName: 'Comission Rate, %', field: 'rate', colId: 'rate', flex: 1, minWidth: 120, sortable: true, filter: 'agNumberColumnFilter', hide: columnVisibility['rate'] === false },
+    { headerName: 'Margin, %', field: 'margin', colId: 'margin', flex: 1, minWidth: 100, sortable: true, filter: 'agNumberColumnFilter', hide: columnVisibility['margin'] === false },
+    { headerName: 'Spend, $', field: 'spend', colId: 'spend', flex: 1, minWidth: 100, sortable: true, filter: 'agNumberColumnFilter', hide: columnVisibility['spend'] === false },
+    { headerName: 'Promotional costs, $', field: 'promoCosts', colId: 'promoCosts', flex: 1, minWidth: 140, sortable: true, filter: 'agNumberColumnFilter', hide: columnVisibility['promoCosts'] === false },
+    { headerName: 'Sales, $', field: 'sales', colId: 'sales', flex: 1, minWidth: 100, sortable: true, filter: 'agNumberColumnFilter', hide: columnVisibility['sales'] === false },
+    { headerName: 'Profit, $', field: 'profit', colId: 'profit', flex: 1, minWidth: 100, sortable: true, filter: 'agNumberColumnFilter', hide: columnVisibility['profit'] === false },
+  ] as any;
 
   const filtered = React.useMemo(() => {
     return detailsRowsBase.filter(r => {
       if (filters.asin && r.asin !== filters.asin) return false;
-      if (showBlogger && filters.blogger && r.blogger !== filters.blogger) return false;
+      if (viewMode === 'blogger' && filters.blogger && r.blogger !== filters.blogger) return false;
       return true;
     });
-  }, [filters.asin, filters.blogger, showBlogger]);
+  }, [filters.asin, filters.blogger, viewMode]);
 
-  return <Table columns={columns as any} dataSource={filtered} pagination={false} />;
+
+  return (
+    <div>
+      <div style={{ marginBottom: 10, padding: 10, background: '#f0f0f0', borderRadius: 4 }}>
+        <Radio.Group 
+          size="small" 
+          value={viewMode} 
+          onChange={(e) => setViewMode(e.target.value)}
+        >
+          <Radio.Button value="product">Product</Radio.Button>
+          <Radio.Button value="blogger">Blogger</Radio.Button>
+        </Radio.Group>
+      </div>
+      
+
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <h4 style={{ margin: 0 }}>Details Table:</h4>
+          <TablePresets 
+            tableId="details" 
+            onPresetChange={handlePresetChange}
+            onSavePreset={saveCurrentSettings}
+          />
+        </div>
+        <div className="ag-theme-alpine" style={{ width: '100%', position: 'relative' }}>
+          <ColumnVisibilityControl 
+            columnDefs={columnDefs}
+            onColumnVisibilityChange={handleColumnVisibilityChange}
+          />
+          <style>{`
+            .ag-theme-alpine .ag-header-cell:first-child .ag-header-cell-label {
+              padding-left: 40px !important;
+            }
+            .ag-theme-alpine .ag-cell {
+              display: flex !important;
+              align-items: center !important;
+              justify-content: flex-start !important;
+            }
+            .ag-theme-alpine .ag-cell-wrapper {
+              display: flex !important;
+              align-items: center !important;
+              height: 100% !important;
+            }
+          `}</style>
+          <AgGridReact
+            ref={gridRef}
+            rowData={filtered}
+            columnDefs={columnDefs}
+            theme="legacy"
+            pagination={true}
+            paginationPageSize={10}
+            paginationPageSizeSelector={[10, 20, 50, 100]}
+            suppressHorizontalScroll={false}
+            suppressColumnVirtualisation={true}
+            suppressRowVirtualisation={true}
+            domLayout="autoHeight"
+            rowHeight={96}
+            defaultColDef={{
+              resizable: true,
+              sortable: true,
+              filter: true,
+            }}
+            onGridReady={() => {
+              if (gridRef.current?.api) {
+                gridRef.current.api.sizeColumnsToFit();
+              }
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function App() {
@@ -648,6 +1750,7 @@ export default function App() {
                   { label: 'Прошлая неделя', value: [dayjs().subtract(1, 'week').startOf('week'), dayjs().subtract(1, 'week').endOf('week')] },
                   { label: 'Этот месяц', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
                   { label: 'Прошлый месяц', value: [dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')] },
+                  { label: 'Сентябрь 2025', value: [dayjs('2025-09-01').startOf('day'), dayjs('2025-09-30').endOf('day')] },
                   { label: 'Последние 3 месяца', value: [dayjs().subtract(3, 'month').startOf('month'), dayjs().endOf('month')] },
                 ]}
                 value={dateRange as any}
@@ -660,7 +1763,7 @@ export default function App() {
               <Dropdown
                 open={presetsOpen}
                 onOpenChange={setPresetsOpen}
-                dropdownRender={() => (
+                popupRender={() => (
                   <div style={{ padding: 8, width: 280, background: '#ffffff', boxShadow: '0 6px 16px rgba(0,0,0,0.15)', border: '1px solid #D9D9D9', borderRadius: 8 }}>
                     <Typography.Text strong>Presets</Typography.Text>
                     <div style={{ maxHeight: 220, overflowY: 'auto', marginTop: 8 }}>
@@ -716,7 +1819,7 @@ export default function App() {
               ))}
             </div>
 
-            <div style={{ position: 'relative', paddingRight: 52 }}>
+            <div style={{ position: 'relative' }}>
               <ChartsBlock dateRange={dateRange} />
               <SummaryToggle dateRange={dateRange} />
               <SummaryPanel dateRange={dateRange} />
@@ -752,8 +1855,12 @@ type ContentRow = {
 
 function ContentTableCard({ filters, dateRange }: { filters: { company?: string; blogger?: string; asin?: string; link?: string }; dateRange: [Dayjs, Dayjs] | null }) {
   const [collapsed, setCollapsed] = React.useState<boolean>(() => {
-    try { return JSON.parse(localStorage.getItem('contentCollapsed') || 'true'); } catch { return true; }
+    try { return JSON.parse(localStorage.getItem('contentCollapsed') || 'false'); } catch { return false; }
   });
+  const [columnVisibility, setColumnVisibility] = React.useState<Record<string, boolean>>({});
+  const [columnOrder, setColumnOrder] = React.useState<string[]>([]);
+  const [columnWidths, setColumnWidths] = React.useState<Record<string, number>>({});
+  const gridRef = React.useRef<AgGridReact>(null);
   React.useEffect(() => { localStorage.setItem('contentCollapsed', JSON.stringify(collapsed)); }, [collapsed]);
 
   const allRows: ContentRow[] = React.useMemo(() => ([
@@ -776,19 +1883,210 @@ function ContentTableCard({ filters, dateRange }: { filters: { company?: string;
     });
   }, [allRows, filters, dateRange]);
 
-  const columns = React.useMemo(() => ([
-    { title: 'ASIN', dataIndex: 'asin', key: 'asin' },
-    { title: 'Blogger', dataIndex: 'blogger', key: 'blogger' },
-    { title: 'Date', dataIndex: 'date', key: 'date', render: (v: string) => dayjs(v).format('DD.MM.YYYY') },
-    { title: 'Campaign', dataIndex: 'campaign', key: 'campaign' },
-    { title: 'Content link', dataIndex: 'link', key: 'link', render: (v: string) => <a href={v} target="_blank" rel="noreferrer">{v}</a> },
-  ]), []);
+  const handleColumnVisibilityChange = (colId: string, visible: boolean) => {
+    setColumnVisibility(prev => ({ ...prev, [colId]: visible }));
+    if (gridRef.current?.api) {
+      gridRef.current.api.setColumnsVisible([colId], visible);
+      gridRef.current.api.sizeColumnsToFit();
+    }
+  };
+
+  const saveCurrentSettings = () => {
+    if (!gridRef.current?.api) return;
+    
+    const columnState = gridRef.current.api.getColumnState();
+    const visibility: Record<string, boolean> = {};
+    const widths: Record<string, number> = {};
+    const order: string[] = [];
+    
+    // Получаем порядок колонок из текущего состояния
+    columnState.forEach(col => {
+      if (col.colId) {
+        visibility[col.colId] = !col.hide;
+        if (col.width) widths[col.colId] = col.width;
+        order.push(col.colId);
+      }
+    });
+    
+    // Если порядок не получен из columnState, используем columnDefs
+    if (order.length === 0) {
+      columnDefs.forEach((col: any) => {
+        if (col.colId) {
+          order.push(col.colId);
+        }
+      });
+    }
+    
+    return {
+      visibility,
+      widths,
+      order,
+      timestamp: Date.now()
+    };
+  };
+
+  const loadSettings = (settings: any) => {
+    if (!settings || !gridRef.current?.api) return;
+    
+    setColumnVisibility(settings.visibility || {});
+    setColumnWidths(settings.widths || {});
+    setColumnOrder(settings.order || []);
+    
+    // Применяем настройки к таблице
+    if (settings.visibility) {
+      Object.entries(settings.visibility).forEach(([colId, visible]) => {
+        gridRef.current?.api.setColumnsVisible([colId], visible as boolean);
+      });
+    }
+    
+    if (settings.widths) {
+      Object.entries(settings.widths).forEach(([colId, width]) => {
+        gridRef.current?.api.setColumnWidths([{ key: colId, newWidth: width as number }]);
+      });
+    }
+    
+    // Применяем порядок колонок
+    if (settings.order && settings.order.length > 0) {
+      try {
+        // Используем moveColumns для изменения порядка
+        const currentColumnState = gridRef.current.api.getColumnState();
+        const currentOrder = currentColumnState.map(col => col.colId).filter(Boolean);
+        
+        // Находим колонки, которые нужно переместить
+        settings.order.forEach((targetColId: string, targetIndex: number) => {
+          const currentIndex = currentOrder.indexOf(targetColId);
+          if (currentIndex !== -1 && currentIndex !== targetIndex) {
+            // Перемещаем колонку в нужную позицию
+            gridRef.current?.api.moveColumns([targetColId], targetIndex);
+          }
+        });
+      } catch (error) {
+        console.warn('Не удалось применить порядок колонок:', error);
+      }
+    }
+    
+    setTimeout(() => {
+      gridRef.current?.api.sizeColumnsToFit();
+    }, 100);
+  };
+
+  const handlePresetChange = (preset: any) => {
+    if (preset) {
+      loadSettings(preset);
+    } else {
+      // Сброс на дефолтные настройки
+      resetToDefaultSettings();
+    }
+  };
+
+  const resetToDefaultSettings = () => {
+    if (!gridRef.current?.api) return;
+    
+    // Сбрасываем состояния
+    setColumnVisibility({});
+    setColumnWidths({});
+    setColumnOrder([]);
+    
+    // Показываем все колонки
+    const allColumnIds = columnDefs.map((col: any) => col.colId).filter(Boolean);
+    gridRef.current.api.setColumnsVisible(allColumnIds, true);
+    
+    // Сбрасываем размеры колонок
+    gridRef.current.api.sizeColumnsToFit();
+  };
+
+  const columnDefs = [
+    { 
+      headerName: 'ASIN', 
+      field: 'asin', 
+      colId: 'asin', 
+      flex: 1, 
+      minWidth: 100, 
+      sortable: true, 
+      filter: true, 
+      hide: columnVisibility['asin'] === false,
+      cellRenderer: (params: any) => (
+        <TruncatedTextWithTooltip 
+          text={params.value || ''}
+          style={{
+            fontSize: '14px',
+            color: '#262626'
+          }}
+        />
+      )
+    },
+    { 
+      headerName: 'Blogger', 
+      field: 'blogger', 
+      colId: 'blogger', 
+      flex: 1, 
+      minWidth: 120, 
+      sortable: true, 
+      filter: true, 
+      hide: columnVisibility['blogger'] === false,
+      cellRenderer: (params: any) => (
+        <TruncatedTextWithTooltip 
+          text={params.value || ''}
+          style={{
+            fontSize: '14px',
+            color: '#262626'
+          }}
+        />
+      )
+    },
+    { 
+      headerName: 'Date', 
+      field: 'date', 
+      colId: 'date', 
+      flex: 1,
+      minWidth: 100,
+      sortable: true, 
+      filter: 'agDateColumnFilter',
+      hide: columnVisibility['date'] === false,
+      valueFormatter: (params: any) => dayjs(params.value).format('DD.MM.YYYY')
+    },
+    { 
+      headerName: 'Campaign', 
+      field: 'campaign', 
+      colId: 'campaign', 
+      flex: 1, 
+      minWidth: 100, 
+      sortable: true, 
+      filter: true, 
+      hide: columnVisibility['campaign'] === false,
+      cellRenderer: (params: any) => (
+        <TruncatedTextWithTooltip 
+          text={params.value || ''}
+          style={{
+            fontSize: '14px',
+            color: '#262626'
+          }}
+        />
+      )
+    },
+    { 
+      headerName: 'Content link', 
+      field: 'link', 
+      colId: 'link', 
+      flex: 2,
+      minWidth: 200,
+      sortable: true, 
+      filter: true,
+      hide: columnVisibility['link'] === false,
+      cellRenderer: (params: any) => (
+        <TruncatedLinkWithTooltip 
+          href={params.value}
+          text={params.value}
+        />
+      )
+    },
+  ] as any;
 
   return (
     <Card
       title="Content"
       style={{ maxWidth: 1600, margin: '0 auto' }}
-      bodyStyle={collapsed ? { display: 'none', padding: 0 } : undefined}
+      styles={{ body: collapsed ? { display: 'none', padding: 0 } : undefined }}
       extra={
         <Button type="text" onClick={() => setCollapsed(v => !v)}>
           {collapsed ? <DownOutlined /> : <UpOutlined />}
@@ -796,7 +2094,64 @@ function ContentTableCard({ filters, dateRange }: { filters: { company?: string;
       }
     >
       {!collapsed && (
-        <Table columns={columns as any} dataSource={rows} pagination={false} />
+        <div>
+          
+
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <h4 style={{ margin: 0 }}>Content Table:</h4>
+              <TablePresets 
+                tableId="content" 
+                onPresetChange={handlePresetChange}
+                onSavePreset={saveCurrentSettings}
+              />
+            </div>
+            <div className="ag-theme-alpine" style={{ width: '100%', position: 'relative' }}>
+              <ColumnVisibilityControl 
+                columnDefs={columnDefs}
+                onColumnVisibilityChange={handleColumnVisibilityChange}
+              />
+              <style>{`
+                .ag-theme-alpine .ag-header-cell:first-child .ag-header-cell-label {
+                  padding-left: 40px !important;
+                }
+                .ag-theme-alpine .ag-cell {
+                  display: flex !important;
+                  align-items: center !important;
+                  justify-content: flex-start !important;
+                }
+                .ag-theme-alpine .ag-cell-wrapper {
+                  display: flex !important;
+                  align-items: center !important;
+                  height: 100% !important;
+                }
+              `}</style>
+              <AgGridReact
+                ref={gridRef}
+                rowData={rows}
+                columnDefs={columnDefs}
+                theme="legacy"
+                pagination={true}
+                paginationPageSize={10}
+                paginationPageSizeSelector={[10, 20, 50, 100]}
+                suppressHorizontalScroll={false}
+                suppressColumnVirtualisation={true}
+                suppressRowVirtualisation={true}
+                domLayout="autoHeight"
+                defaultColDef={{
+                  resizable: true,
+                  sortable: true,
+                  filter: true,
+                }}
+                onGridReady={() => {
+                  if (gridRef.current?.api) {
+                    gridRef.current.api.sizeColumnsToFit();
+                  }
+                }}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </Card>
   );
@@ -821,10 +2176,10 @@ function SummaryToggle({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
     <Button
       type="text"
       onClick={toggle}
-      style={{ position: 'absolute', top: 8, right: open ? 364 : 4, zIndex: 50, border: '1px solid #D9D9D9', borderRadius: 16, background: '#ffffff', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}
+      style={{ position: 'fixed', top: 128, right: open ? 364 : 4, zIndex: 50, border: '1px solid #D9D9D9', borderRadius: 16, background: '#ffffff', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}
       aria-label="Toggle summary"
     >
-      {open ? <CaretRightOutlined /> : <CaretLeftOutlined />}
+      {open ? <RightCircleOutlined /> : <LeftCircleOutlined />}
     </Button>
   );
 }
@@ -866,8 +2221,8 @@ function SummaryPanel({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
   const profit = curM.Profit;
 
   return (
-    <div style={{ position: 'absolute', top: 0, right: 0, width: open ? 360 : 0, overflow: 'hidden', transition: 'width 0.2s ease', zIndex: 20 }}>
-      <Card bodyStyle={{ padding: open ? 16 : 0, display: open ? 'block' : 'none' }}>
+    <div style={{ position: 'fixed', top: 0, right: 0, width: open ? 360 : 0, overflow: 'hidden', transition: 'width 0.2s ease', zIndex: 20, height: '100vh', paddingTop: '120px' }}>
+      <Card styles={{ body: { padding: open ? 16 : 0, display: open ? 'block' : 'none', height: 'fit-content' } }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <Typography.Text strong>Summary</Typography.Text>
           <Badge color="#007bff" text={<span style={{ color: '#666' }}>{periodText}</span>} />

@@ -36,3 +36,225 @@
     transform: rotate(360deg);
   }
 }
+
+/* AG Grid Custom Styles - Ant Design Theme */
+.ag-theme-alpine {
+  --ag-header-background-color: #fafafa;
+  --ag-header-foreground-color: #262626;
+  --ag-border-color: #f0f0f0;
+  --ag-row-hover-color: #f5f5f5;
+  --ag-selected-row-background-color: #e6f7ff;
+  --ag-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --ag-font-size: 14px;
+  --ag-border-radius: 6px;
+  --ag-header-height: auto;
+  --ag-row-height: 48px;
+  --ag-cell-horizontal-padding: 16px;
+  --ag-header-cell-horizontal-padding: 16px;
+  --ag-background-color: #ffffff;
+  --ag-odd-row-background-color: #ffffff;
+  --ag-even-row-background-color: #fafafa;
+  --ag-header-column-separator-color: #f0f0f0;
+  --ag-header-column-separator-height: 24px;
+  --ag-header-column-separator-display: block;
+}
+
+.ag-theme-alpine .ag-header {
+  border-bottom: 1px solid #f0f0f0;
+  font-weight: 500;
+  background-color: #fafafa;
+}
+
+.ag-theme-alpine .ag-header-cell {
+  border-right: 1px solid #f0f0f0;
+  font-weight: 500;
+  color: #262626;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 8px 16px;
+}
+
+.ag-theme-alpine .ag-header-cell:hover {
+  background-color: #f5f5f5;
+}
+
+.ag-theme-alpine .ag-header-cell-sortable {
+  cursor: pointer;
+}
+
+.ag-theme-alpine .ag-header-cell-sortable:hover {
+  background-color: #f5f5f5;
+}
+
+.ag-theme-alpine .ag-header-cell-label {
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: unset;
+  flex: 1;
+  text-align: center;
+}
+
+.ag-theme-alpine .ag-header-cell-menu-button {
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+
+.ag-theme-alpine .ag-sort-indicator-icon {
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+
+.ag-theme-alpine .ag-header-cell-resize {
+  width: 4px;
+  background-color: transparent;
+}
+
+.ag-theme-alpine .ag-header-cell-resize:hover {
+  background-color: #1890ff;
+}
+
+.ag-theme-alpine .ag-row {
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s ease;
+}
+
+.ag-theme-alpine .ag-row:hover {
+  background-color: #f5f5f5;
+}
+
+.ag-theme-alpine .ag-row-even {
+  background-color: #fafafa;
+}
+
+.ag-theme-alpine .ag-row-odd {
+  background-color: #ffffff;
+}
+
+.ag-theme-alpine .ag-cell {
+  border-right: 1px solid #f0f0f0;
+  color: #262626;
+  line-height: 1.5715;
+}
+
+.ag-theme-alpine .ag-cell-focus {
+  border: 1px solid #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+.ag-theme-alpine .ag-paging-panel {
+  border-top: 1px solid #f0f0f0;
+  background-color: #fafafa;
+  padding: 12px 16px;
+  font-size: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ag-theme-alpine .ag-paging-button {
+  border-radius: 6px;
+  border: 1px solid #d9d9d9;
+  background-color: #ffffff;
+  color: #262626;
+  padding: 4px 8px;
+  margin: 0 4px;
+  transition: all 0.2s ease;
+  min-width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ag-theme-alpine .ag-paging-button:hover {
+  background-color: #f5f5f5;
+  border-color: #1890ff;
+  color: #1890ff;
+}
+
+.ag-theme-alpine .ag-paging-button[disabled] {
+  background-color: #f5f5f5;
+  color: #bfbfbf;
+  border-color: #f0f0f0;
+  cursor: not-allowed;
+}
+
+.ag-theme-alpine .ag-paging-page-summary-panel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ag-theme-alpine .ag-paging-page-summary-panel select {
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  padding: 4px 8px;
+  background-color: #ffffff;
+  color: #262626;
+  font-size: 14px;
+  min-width: 60px;
+}
+
+.ag-theme-alpine .ag-paging-page-summary-panel select:focus {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+  outline: none;
+}
+
+.ag-theme-alpine .ag-filter-toolpanel-header {
+  background-color: #fafafa;
+  border-bottom: 1px solid #f0f0f0;
+  font-weight: 500;
+}
+
+.ag-theme-alpine .ag-filter-toolpanel-search {
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  padding: 4px 8px;
+  transition: all 0.2s ease;
+}
+
+.ag-theme-alpine .ag-filter-toolpanel-search:focus {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+  outline: none;
+}
+
+/* Product column specific styling */
+.ag-theme-alpine .ag-cell[col-id="productOrBlogger"] {
+  padding: 8px 16px;
+}
+
+.ag-theme-alpine .ag-cell[col-id="productOrBlogger"] img {
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Number formatting */
+.ag-theme-alpine .ag-cell[col-id="orders"],
+.ag-theme-alpine .ag-cell[col-id="clicks"] {
+  text-align: right;
+  font-weight: 500;
+}
+
+.ag-theme-alpine .ag-cell[col-id="conversion"],
+.ag-theme-alpine .ag-cell[col-id="rate"],
+.ag-theme-alpine .ag-cell[col-id="margin"] {
+  text-align: right;
+  color: #1890ff;
+  font-weight: 500;
+}
+
+.ag-theme-alpine .ag-cell[col-id="spend"],
+.ag-theme-alpine .ag-cell[col-id="promoCosts"],
+.ag-theme-alpine .ag-cell[col-id="sales"],
+.ag-theme-alpine .ag-cell[col-id="profit"] {
+  text-align: right;
+  color: #52c41a;
+  font-weight: 500;
+}
