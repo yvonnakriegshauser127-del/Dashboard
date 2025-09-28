@@ -24,6 +24,122 @@ Chart.register(CrosshairPlugin);
 const { Header, Content } = Layout;
 const { RangePicker } = DatePicker;
 
+// Helper function to check if the selected period is a default preset
+const isDefaultPreset = (dateRange: [Dayjs, Dayjs] | null): boolean => {
+  if (!dateRange) return false;
+  
+  const [start, end] = dateRange;
+  const today = dayjs();
+  
+  // Check if it matches any default presets
+  const isToday = start.isSame(today.startOf('day')) && end.isSame(today.endOf('day'));
+  const isYesterday = start.isSame(today.subtract(1, 'day').startOf('day')) && end.isSame(today.subtract(1, 'day').endOf('day'));
+  const isThisWeek = start.isSame(today.startOf('week')) && end.isSame(today.endOf('week'));
+  const isLastWeek = start.isSame(today.subtract(1, 'week').startOf('week')) && end.isSame(today.subtract(1, 'week').endOf('week'));
+  const isThisMonth = start.isSame(today.startOf('month')) && end.isSame(today.endOf('month'));
+  const isLastMonth = start.isSame(today.subtract(1, 'month').startOf('month')) && end.isSame(today.subtract(1, 'month').endOf('month'));
+  const isLast3Months = start.isSame(today.subtract(3, 'month').startOf('month')) && end.isSame(today.endOf('month'));
+  const isSeptember2025 = start.isSame(dayjs('2025-09-01').startOf('day')) && end.isSame(dayjs('2025-09-30').endOf('day'));
+  
+  return isToday || isYesterday || isThisWeek || isLastWeek || isThisMonth || isLastMonth || isLast3Months || isSeptember2025;
+};
+
+// Helper function to get the axis type based on period and user choice
+const getDateRangeType = (dateRange: [Dayjs, Dayjs] | null, userAxisType?: 'day' | 'week' | 'month'): 'day' | 'week' | 'month' | null => {
+  if (!dateRange) return null;
+  
+  const [start, end] = dateRange;
+  const diffInDays = end.diff(start, 'day') + 1; // +1 to include both start and end days
+  
+  // If user has custom period and specified axis type, use it (with validation)
+  if (!isDefaultPreset(dateRange) && userAxisType) {
+    // Validate that the chosen axis type makes sense for the period
+    if (userAxisType === 'week' && diffInDays <= 7) return 'day';
+    if (userAxisType === 'month' && diffInDays <= 31) return diffInDays <= 7 ? 'day' : 'week';
+    return userAxisType;
+  }
+  
+  // For default presets, use automatic logic
+  const today = dayjs();
+  const isToday = start.isSame(today.startOf('day')) && end.isSame(today.endOf('day'));
+  const isYesterday = start.isSame(today.subtract(1, 'day').startOf('day')) && end.isSame(today.subtract(1, 'day').endOf('day'));
+  const isThisWeek = start.isSame(today.startOf('week')) && end.isSame(today.endOf('week'));
+  const isLastWeek = start.isSame(today.subtract(1, 'week').startOf('week')) && end.isSame(today.subtract(1, 'week').endOf('week'));
+  const isThisMonth = start.isSame(today.startOf('month')) && end.isSame(today.endOf('month'));
+  const isLastMonth = start.isSame(today.subtract(1, 'month').startOf('month')) && end.isSame(today.subtract(1, 'month').endOf('month'));
+  const isLast3Months = start.isSame(today.subtract(3, 'month').startOf('month')) && end.isSame(today.endOf('month'));
+  
+  // Default presets logic
+  if (isToday || isYesterday || isThisWeek || isLastWeek || isThisMonth || isLastMonth) {
+    return 'day';
+  }
+  if (isLast3Months) {
+    return 'week';
+  }
+  
+  // Custom period fallback logic
+  if (diffInDays <= 31) {
+    return 'day';
+  } else if (diffInDays <= 93) { // ~3 months
+    return 'week';
+  } else {
+    return 'month';
+  }
+};
+
+// Enhanced function to build labels based on period type
+const buildLabelsWithPeriodType = (dateRange: [Dayjs, Dayjs] | null, userAxisType?: 'day' | 'week' | 'month'): string[] => {
+  if (!dateRange) return [dayjs().format('DD.MM')];
+  
+  const [start, end] = dateRange;
+  const periodType = getDateRangeType(dateRange, userAxisType);
+  const labels: string[] = [];
+  
+  switch (periodType) {
+    case 'day': {
+      let d = start.startOf('day');
+      const last = end.endOf('day');
+      while (d.isBefore(last) || d.isSame(last, 'day')) {
+        labels.push(d.format('DD.MM'));
+        d = d.add(1, 'day');
+      }
+      break;
+    }
+    case 'week': {
+      let d = start.startOf('week');
+      const last = end.endOf('day');
+      while (d.isBefore(last) || d.isSame(last, 'week')) {
+        const weekEnd = d.endOf('week');
+        const displayStart = d.isAfter(start) ? d : start;
+        const displayEnd = weekEnd.isAfter(end) ? end : weekEnd;
+        labels.push(`${displayStart.format('DD.MM')}-${displayEnd.format('DD.MM')}`);
+        d = d.add(1, 'week');
+      }
+      break;
+    }
+    case 'month': {
+      let d = start.startOf('month');
+      const last = end.endOf('day');
+      while (d.isBefore(last) || d.isSame(last, 'month')) {
+        labels.push(d.format('MMM YYYY'));
+        d = d.add(1, 'month');
+      }
+      break;
+    }
+    default: {
+      // Fallback to day-by-day
+      let d = start.startOf('day');
+      const last = end.endOf('day');
+      while (d.isBefore(last) || d.isSame(last, 'day')) {
+        labels.push(d.format('DD.MM'));
+        d = d.add(1, 'day');
+      }
+    }
+  }
+  
+  return labels;
+};
+
 const appTheme = {
   token: {
     colorPrimary: '#007bff',
@@ -78,16 +194,10 @@ const bloggerOptions = [
 ];
 // asinOptions will be derived later after detailsRowsBase is declared
 let asinOptions: { value: string; label: string }[] = [];
-const linkOptions = [
-  { value: 'https://youtube.com/watch?v=abc123', label: 'https://youtube.com/watch?v=abc123' },
-  { value: 'https://instagram.com/p/xyz789', label: 'https://instagram.com/p/xyz789' },
-  { value: 'https://tiktok.com/@user/video/456', label: 'https://tiktok.com/@user/video/456' },
-  { value: 'https://blog.example.com/post-1', label: 'https://blog.example.com/post-1' },
-  { value: 'https://youtube.com/shorts/def456', label: 'https://youtube.com/shorts/def456' },
-];
+// linkOptions will be generated dynamically from contentRowsBase
 
-const prevM = { Spend:1774.18, Clicks:3249, Orders:120, Sales:8065.07, Conversion:'12%', 'Commision Rate':'5%', Profit:3200, 'Promotional Costs': 650.00 } as const;
-const curM  = { Spend:3372.42, Clicks:6200, Orders:100, Sales:15450.24, Conversion:'15%', 'Commision Rate':'7%', Profit:5400, 'Promotional Costs': 980.00 } as const;
+const prevM = { Spend:1774.18, Clicks:3249, Orders:120, Sales:8065.07, Conversion:'12%', 'Commision Rate':'5%', Profit:3200, 'Promotional Costs': 650.00, 'Total expenses': 2424.18 } as const;
+const curM  = { Spend:3372.42, Clicks:6200, Orders:100, Sales:15450.24, Conversion:'15%', 'Commision Rate':'7%', Profit:5400, 'Promotional Costs': 980.00, 'Total expenses': 4352.42 } as const;
 const allMetrics = Object.keys(prevM) as Array<keyof typeof prevM>;
 
 function MetricCard({ title, value, prev }: { title: string; value: number|string; prev: number|string }) {
@@ -113,24 +223,15 @@ function MetricCard({ title, value, prev }: { title: string; value: number|strin
   );
 }
 
-function ChartCard({ dateRange, collapsed }: { dateRange: [Dayjs, Dayjs] | null; collapsed: boolean }) {
+function ChartCard({ dateRange, collapsed, axisType }: { dateRange: [Dayjs, Dayjs] | null; collapsed: boolean; axisType?: 'day' | 'week' | 'month' }) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const chartRef = React.useRef<Chart | null>(null);
   const [checks, setChecks] = React.useState<{ spend: boolean; profit: boolean; orders: boolean; none: boolean }>({ spend: true, profit: true, orders: true, none: false });
   const [dropOpen, setDropOpen] = React.useState(false);
 
   const buildLabels = React.useCallback((): string[] => {
-    if (!dateRange) return [dayjs().format('DD.MM')];
-    const [start, end] = dateRange;
-    const labels: string[] = [];
-    let d = start.startOf('day');
-    const last = end.endOf('day');
-    while (d.isBefore(last) || d.isSame(last, 'day')) {
-      labels.push(d.format('DD.MM'));
-      d = d.add(1, 'day');
-    }
-    return labels;
-  }, [dateRange]);
+    return buildLabelsWithPeriodType(dateRange, axisType);
+  }, [dateRange, axisType]);
 
   const buildDatasets = React.useCallback((labels: string[]) => {
     const generateRealisticData = (baseValue: number, volatility: number = 0.15) => {
@@ -346,24 +447,15 @@ function ChartCard({ dateRange, collapsed }: { dateRange: [Dayjs, Dayjs] | null;
   );
 }
 
-function SecondaryChart({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
+function SecondaryChart({ dateRange, axisType }: { dateRange: [Dayjs, Dayjs] | null; axisType?: 'day' | 'week' | 'month' }) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const chartRef = React.useRef<Chart | null>(null);
   const [checks, setChecks] = React.useState<{ clicks: boolean; orders: boolean; conversion: boolean; none: boolean }>({ clicks: true, orders: true, conversion: true, none: false });
   const [dropOpen, setDropOpen] = React.useState(false);
 
   const buildLabels = React.useCallback((): string[] => {
-    if (!dateRange) return [dayjs().format('DD.MM')];
-    const [start, end] = dateRange;
-    const labels: string[] = [];
-    let d = start.startOf('day');
-    const last = end.endOf('day');
-    while (d.isBefore(last) || d.isSame(last, 'day')) {
-      labels.push(d.format('DD.MM'));
-      d = d.add(1, 'day');
-    }
-    return labels;
-  }, [dateRange]);
+    return buildLabelsWithPeriodType(dateRange, axisType);
+  }, [dateRange, axisType]);
 
   const buildDatasets = React.useCallback((labels: string[]) => {
     const generateRealisticData = (baseValue: number, volatility: number = 0.15, isPercentage: boolean = false) => {
@@ -599,53 +691,42 @@ function UnifiedChart({
   dateRange, 
   collapsed, 
   chartId, 
-  initialChecks,
-  onDelete 
+  checks,
+  onChecksChange,
+  onDelete,
+  axisType
 }: { 
   dateRange: [Dayjs, Dayjs] | null; 
   collapsed: boolean;
   chartId: string;
-  initialChecks?: { 
+  axisType: 'day' | 'week' | 'month';
+  checks: { 
     spend: boolean; 
     profit: boolean; 
     orders: boolean; 
     clicks: boolean; 
     conversion: boolean; 
+    totalExpenses: boolean;
     none: boolean 
   };
+  onChecksChange: (next: { 
+    spend: boolean; 
+    profit: boolean; 
+    orders: boolean; 
+    clicks: boolean; 
+    conversion: boolean; 
+    totalExpenses: boolean;
+    none: boolean 
+  }) => void;
   onDelete?: () => void;
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const chartRef = React.useRef<Chart | null>(null);
-  const [checks, setChecks] = React.useState<{ 
-    spend: boolean; 
-    profit: boolean; 
-    orders: boolean; 
-    clicks: boolean; 
-    conversion: boolean; 
-    none: boolean 
-  }>(initialChecks || { 
-    spend: true, 
-    profit: true, 
-    orders: true, 
-    clicks: true, 
-    conversion: true, 
-    none: false 
-  });
   const [dropOpen, setDropOpen] = React.useState(false);
 
   const buildLabels = React.useCallback((): string[] => {
-    if (!dateRange) return [dayjs().format('DD.MM')];
-    const [start, end] = dateRange;
-    const labels: string[] = [];
-    let d = start.startOf('day');
-    const last = end.endOf('day');
-    while (d.isBefore(last) || d.isSame(last, 'day')) {
-      labels.push(d.format('DD.MM'));
-      d = d.add(1, 'day');
-    }
-    return labels;
-  }, [dateRange]);
+    return buildLabelsWithPeriodType(dateRange, axisType);
+  }, [dateRange, axisType]);
 
   const buildDatasets = React.useCallback((labels: string[]) => {
     const generateRealisticData = (baseValue: number, volatility: number = 0.15, isPercentage: boolean = false) => {
@@ -661,7 +742,7 @@ function UnifiedChart({
       });
     };
 
-    const moneySelected = checks.spend || checks.profit;
+    const moneySelected = checks.spend || checks.profit || checks.totalExpenses;
     const countSelected = checks.orders || checks.clicks;
     const percentSelected = checks.conversion;
     
@@ -703,6 +784,7 @@ function UnifiedChart({
 
     if (checks.spend) addPair('Spend', 500, '#1890ff', yLeftId, 0.2);
     if (checks.profit) addPair('Profit', 200, '#52c41a', yLeftId, 0.25);
+    if (checks.totalExpenses) addPair('Total expenses', 700, '#ff4d4f', yLeftId, 0.2);
     if (checks.orders) addPair('Orders', 15, '#fa8c16', yRightId, 0.3);
     if (checks.clicks) addPair('Clicks', 100, '#722ed1', yRightId, 0.2);
     if (checks.conversion) addPair('Conversion', 15, '#eb2f96', yPercentId, 0.15, true);
@@ -722,7 +804,7 @@ function UnifiedChart({
     const labels = buildLabels();
     const datasets = buildDatasets(labels);
 
-    const moneySelected = checks.spend || checks.profit;
+    const moneySelected = checks.spend || checks.profit || checks.totalExpenses;
     const countSelected = checks.orders || checks.clicks;
     const percentSelected = checks.conversion;
 
@@ -769,7 +851,7 @@ function UnifiedChart({
                 let value = context.parsed.y;
                 let formattedValue = value;
                 
-                if (label === 'Spend' || label === 'Profit') {
+                if (label === 'Spend' || label === 'Profit' || label === 'Total expenses') {
                   formattedValue = `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                 } else if (label === 'Conversion') {
                   formattedValue = `${value}%`;
@@ -803,7 +885,7 @@ function UnifiedChart({
             position: 'left',
             title: {
               display: true,
-              text: 'Spend & Profit ($)',
+              text: 'Spend, Profit & Total expenses ($)',
               color: '#666'
             },
             grid: {
@@ -858,13 +940,42 @@ function UnifiedChart({
     });
   }, [buildLabels, buildDatasets, checks]);
 
+  const handleMetricChange = (metric: keyof typeof checks, checked: boolean) => {
+    if (metric === 'none') {
+      if (checked) {
+        // If None is checked, uncheck all others
+        onChecksChange({ spend: false, profit: false, orders: false, clicks: false, conversion: false, totalExpenses: false, none: true });
+      } else {
+        // If None is unchecked, keep current state but set none to false
+        onChecksChange({ ...checks, none: false });
+      }
+    } else {
+      // For any metric checkbox
+      const newChecks = { ...checks, [metric]: checked };
+      
+      // If any metric is checked, uncheck None
+      if (checked) {
+        newChecks.none = false;
+      } else {
+        // If this was the last checked metric, check None
+        const hasAnyMetric = newChecks.spend || newChecks.profit || newChecks.orders || newChecks.clicks || newChecks.conversion || newChecks.totalExpenses;
+        if (!hasAnyMetric) {
+          newChecks.none = true;
+        }
+      }
+      
+      onChecksChange(newChecks);
+    }
+  };
+
   const items: MenuProps['items'] = [
-    { key: 'spend', label: <Checkbox checked={checks.spend} onChange={e => setChecks(prev => ({ ...prev, spend: e.target.checked }))}>Spend</Checkbox> },
-    { key: 'profit', label: <Checkbox checked={checks.profit} onChange={e => setChecks(prev => ({ ...prev, profit: e.target.checked }))}>Profit</Checkbox> },
-    { key: 'orders', label: <Checkbox checked={checks.orders} onChange={e => setChecks(prev => ({ ...prev, orders: e.target.checked }))}>Orders</Checkbox> },
-    { key: 'clicks', label: <Checkbox checked={checks.clicks} onChange={e => setChecks(prev => ({ ...prev, clicks: e.target.checked }))}>Clicks</Checkbox> },
-    { key: 'conversion', label: <Checkbox checked={checks.conversion} onChange={e => setChecks(prev => ({ ...prev, conversion: e.target.checked }))}>Conversion</Checkbox> },
-    { key: 'none', label: <Checkbox checked={checks.none} onChange={e => setChecks(prev => ({ ...prev, none: e.target.checked, spend: false, profit: false, orders: false, clicks: false, conversion: false }))}>None</Checkbox> },
+    { key: 'spend', label: <Checkbox checked={checks.spend} onChange={e => { e.stopPropagation(); handleMetricChange('spend', e.target.checked); }}>Spend</Checkbox> },
+    { key: 'profit', label: <Checkbox checked={checks.profit} onChange={e => { e.stopPropagation(); handleMetricChange('profit', e.target.checked); }}>Profit</Checkbox> },
+    { key: 'orders', label: <Checkbox checked={checks.orders} onChange={e => { e.stopPropagation(); handleMetricChange('orders', e.target.checked); }}>Orders</Checkbox> },
+    { key: 'clicks', label: <Checkbox checked={checks.clicks} onChange={e => { e.stopPropagation(); handleMetricChange('clicks', e.target.checked); }}>Clicks</Checkbox> },
+    { key: 'conversion', label: <Checkbox checked={checks.conversion} onChange={e => { e.stopPropagation(); handleMetricChange('conversion', e.target.checked); }}>Conversion</Checkbox> },
+    { key: 'totalExpenses', label: <Checkbox checked={checks.totalExpenses} onChange={e => { e.stopPropagation(); handleMetricChange('totalExpenses', e.target.checked); }}>Total expenses</Checkbox> },
+    { key: 'none', label: <Checkbox checked={checks.none} onChange={e => { e.stopPropagation(); handleMetricChange('none', e.target.checked); }}>None</Checkbox> },
   ];
 
   if (collapsed) return null;
@@ -873,10 +984,30 @@ function UnifiedChart({
     <Card style={{ marginBottom: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <Typography.Title level={4} style={{ margin: 0 }}>
-          {chartId === 'main' ? 'Unified Metrics Chart' : `Chart ${chartId}`}
+          {chartId === 'main' ? 'Main Chart' : `Chart #${chartId.split('-')[1]}`}
         </Typography.Title>
         <div style={{ display: 'flex', gap: 8 }}>
-          <Dropdown menu={{ items }} open={dropOpen} onOpenChange={setDropOpen} trigger={['click']}>
+          <Dropdown 
+            open={dropOpen} 
+            onOpenChange={setDropOpen} 
+            trigger={['click']}
+            dropdownRender={() => (
+              <div style={{ 
+                background: '#fff', 
+                border: '1px solid #d9d9d9', 
+                borderRadius: '6px', 
+                boxShadow: '0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 9px 28px 8px rgba(0, 0, 0, 0.05)',
+                padding: '4px 0',
+                minWidth: '120px'
+              }}>
+                {items.map((item) => (
+                  <div key={item?.key} style={{ padding: '4px 12px' }}>
+                    {item && 'label' in item ? item.label : null}
+                  </div>
+                ))}
+              </div>
+            )}
+          >
             <Button>⚙️ <DownOutlined /></Button>
           </Dropdown>
           {chartId !== 'main' && onDelete && (
@@ -907,7 +1038,26 @@ function CollapseCharts() {
   );
 }
 
-function ChartsBlock({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
+type ChartPreset = {
+  name: string;
+  charts: Array<{
+    id: string;
+    checks: { 
+      spend: boolean; 
+      profit: boolean; 
+      orders: boolean; 
+      clicks: boolean; 
+      conversion: boolean; 
+      totalExpenses: boolean;
+      none: boolean 
+    };
+  }>;
+  rowChartIds: string[];
+  columnChartIds: string[];
+  timestamp: number;
+};
+
+function ChartsBlock({ dateRange, axisType }: { dateRange: [Dayjs, Dayjs] | null; axisType: 'day' | 'week' | 'month' }) {
   const [collapsed, setCollapsed] = React.useState<boolean>(() => {
     try { return JSON.parse(localStorage.getItem('chartsCollapsed') || 'false'); } catch { return false; }
   });
@@ -919,21 +1069,45 @@ function ChartsBlock({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
       orders: boolean; 
       clicks: boolean; 
       conversion: boolean; 
+      totalExpenses: boolean;
       none: boolean 
     };
-  }>>([
-    {
-      id: 'main',
-      checks: { 
-        spend: true, 
-        profit: true, 
-        orders: true, 
-        clicks: true, 
-        conversion: true, 
-        none: false 
+  }>>(() => {
+    try { 
+      const saved = localStorage.getItem('charts');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [
+      {
+        id: 'main',
+        checks: { 
+          spend: true, 
+          profit: true, 
+          orders: true, 
+          clicks: true, 
+          conversion: true, 
+          totalExpenses: true,
+          none: false 
+        }
       }
-    }
-  ]);
+    ];
+  });
+
+  // Layout state: pin main in the row, others can be in row (right of main) or in column (below main)
+  const [rowChartIds, setRowChartIds] = React.useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('rowChartIds') || '["main"]'); } catch { return ['main']; }
+  });
+  const [columnChartIds, setColumnChartIds] = React.useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('columnChartIds') || '[]'); } catch { return []; }
+  });
+  const [draggingId, setDraggingId] = React.useState<string | null>(null);
+
+  // Presets state
+  const [presets, setPresets] = React.useState<ChartPreset[]>(() => {
+    try { return JSON.parse(localStorage.getItem('chartPresets') || '[]'); } catch { return []; }
+  });
+  const [presetsOpen, setPresetsOpen] = React.useState(false);
+  const [newPresetName, setNewPresetName] = React.useState('');
 
   React.useEffect(() => {
     const onStorage = () => {
@@ -943,8 +1117,24 @@ function ChartsBlock({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
     return () => window.removeEventListener('storage', onStorage);
   }, []);
 
+  // Save charts state
+  React.useEffect(() => {
+    try { localStorage.setItem('charts', JSON.stringify(charts)); } catch {}
+  }, [charts]);
+
+  React.useEffect(() => {
+    try { localStorage.setItem('rowChartIds', JSON.stringify(rowChartIds)); } catch {}
+  }, [rowChartIds]);
+
+  React.useEffect(() => {
+    try { localStorage.setItem('columnChartIds', JSON.stringify(columnChartIds)); } catch {}
+  }, [columnChartIds]);
+
   const addChart = () => {
-    const newChartId = `chart-${Date.now()}`;
+    // Find the next chart number
+    const existingCharts = charts.filter(chart => chart.id !== 'main');
+    const nextChartNumber = existingCharts.length + 2; // +2 because we start from Chart #2
+    const newChartId = `chart-${nextChartNumber}`;
     const mainChart = charts.find(chart => chart.id === 'main');
     const newChart = {
       id: newChartId,
@@ -954,42 +1144,303 @@ function ChartsBlock({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
         orders: true, 
         clicks: true, 
         conversion: true, 
+        totalExpenses: true,
         none: false 
       }
     };
     setCharts(prev => [...prev, newChart]);
+    // By default, new chart goes to the column below main
+    setColumnChartIds(prev => [...prev, newChartId]);
   };
 
   const deleteChart = (chartId: string) => {
     if (chartId === 'main') return; // Нельзя удалить основной график
     setCharts(prev => prev.filter(chart => chart.id !== chartId));
+    setRowChartIds(prev => prev.filter(id => id !== chartId));
+    setColumnChartIds(prev => prev.filter(id => id !== chartId));
+  };
+
+  // Keep layout lists in sync with charts list; ensure main stays in row
+  React.useEffect(() => {
+    setRowChartIds(prev => {
+      const existingIds = new Set(charts.map(c => c.id));
+      const next = prev.filter(id => existingIds.has(id));
+      if (!next.includes('main')) next.unshift('main');
+      // De-duplicate
+      return Array.from(new Set(next));
+    });
+    setColumnChartIds(prev => {
+      const existingIds = new Set(charts.map(c => c.id));
+      // remove non-existing and main from column
+      const cleaned = prev.filter(id => existingIds.has(id) && id !== 'main');
+      const alreadyPlaced = new Set([...rowChartIds, ...cleaned]);
+      const missing = charts.map(c => c.id).filter(id => id !== 'main' && !alreadyPlaced.has(id));
+      return [...cleaned, ...missing];
+    });
+  }, [charts]);
+
+  // Drag handlers (HTML5 DnD)
+  const handleChartDragStart = (id: string) => (e: React.DragEvent) => {
+    if (id === 'main') return;
+    setDraggingId(id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+  const handleChartDragEnd = () => setDraggingId(null);
+
+  const canDropToRow = React.useMemo(() => {
+    return !!draggingId && columnChartIds.includes(draggingId) && rowChartIds.length < 3;
+  }, [draggingId, columnChartIds, rowChartIds.length]);
+  const canDropToColumn = React.useMemo(() => {
+    return !!draggingId && rowChartIds.includes(draggingId) && draggingId !== 'main';
+  }, [draggingId, rowChartIds]);
+
+  const onDropToRow = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!draggingId || !canDropToRow) return;
+    setColumnChartIds(prev => prev.filter(id => id !== draggingId));
+    setRowChartIds(prev => [...prev, draggingId]);
+    setDraggingId(null);
+  };
+  const onDropToColumn = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!draggingId || !canDropToColumn) return;
+    setRowChartIds(prev => prev.filter(id => id !== draggingId));
+    // place just below main (top of column)
+    setColumnChartIds(prev => [draggingId, ...prev]);
+    setDraggingId(null);
+  };
+
+  const updateChartChecks = (chartId: string, nextChecks: { 
+    spend: boolean; profit: boolean; orders: boolean; clicks: boolean; conversion: boolean; totalExpenses: boolean; none: boolean 
+  }) => {
+    setCharts(prev => prev.map(c => c.id === chartId ? { ...c, checks: nextChecks } : c));
+  };
+
+  // Preset functions
+  const savePreset = () => {
+    if (!newPresetName.trim()) return;
+    
+    const preset: ChartPreset = {
+      name: newPresetName.trim(),
+      charts: [...charts],
+      rowChartIds: [...rowChartIds],
+      columnChartIds: [...columnChartIds],
+      timestamp: Date.now()
+    };
+    
+    const newPresets = [...presets, preset];
+    setPresets(newPresets);
+    localStorage.setItem('chartPresets', JSON.stringify(newPresets));
+    setNewPresetName('');
+    setPresetsOpen(false);
+  };
+
+  const applyPreset = (preset: ChartPreset) => {
+    setCharts([...preset.charts]);
+    setRowChartIds([...preset.rowChartIds]);
+    setColumnChartIds([...preset.columnChartIds]);
+    setPresetsOpen(false);
+  };
+
+  const deletePreset = (presetName: string) => {
+    const newPresets = presets.filter(p => p.name !== presetName);
+    setPresets(newPresets);
+    localStorage.setItem('chartPresets', JSON.stringify(newPresets));
+  };
+
+  const resetToDefault = () => {
+    const defaultCharts = [{
+      id: 'main',
+      checks: { 
+        spend: true, 
+        profit: true, 
+        orders: true, 
+        clicks: true, 
+        conversion: true, 
+        totalExpenses: true,
+        none: false 
+      }
+    }];
+    setCharts(defaultCharts);
+    setRowChartIds(['main']);
+    setColumnChartIds([]);
+    setPresetsOpen(false);
   };
 
   return (
     <>
-      {charts.map((chart, index) => (
-        <div key={chart.id}>
-          <UnifiedChart 
-            dateRange={dateRange} 
-            collapsed={collapsed} 
-            chartId={chart.id}
-            initialChecks={chart.checks}
-            onDelete={chart.id !== 'main' ? () => deleteChart(chart.id) : undefined}
-          />
-          {index === 0 && !collapsed && (
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-              <Button 
-                type="dashed" 
-                icon={<PlusCircleOutlined />}
-                onClick={addChart}
-                style={{ borderStyle: 'dashed', borderColor: '#d9d9d9' }}
-              >
-                Add Chart
-              </Button>
-            </div>
-          )}
+      {/* Presets dropdown */}
+      {!collapsed && (
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+          <Dropdown
+            open={presetsOpen}
+            onOpenChange={setPresetsOpen}
+            dropdownRender={() => (
+              <div style={{ 
+                background: '#fff', 
+                border: '1px solid #d9d9d9', 
+                borderRadius: '6px', 
+                boxShadow: '0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 9px 28px 8px rgba(0, 0, 0, 0.05)',
+                padding: '8px',
+                minWidth: '280px'
+              }}>
+                
+                <div style={{ maxHeight: '220px', overflowY: 'auto', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 4px' }}>
+                    <Button type="link" style={{ padding: 0 }} onClick={resetToDefault}>
+                      Reset to Default
+                    </Button>
+                  </div>
+                  
+                  {presets.length === 0 && (
+                    <Typography.Text type="secondary" style={{ display: 'block', padding: '6px 4px' }}>
+                      No presets saved
+                    </Typography.Text>
+                  )}
+                  
+                  {presets.map((preset, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 4px' }}>
+                      <Button 
+                        type="link" 
+                        style={{ padding: 0 }} 
+                        onClick={() => applyPreset(preset)}
+                      >
+                        {preset.name}
+                      </Button>
+                      <Button 
+                        size="small" 
+                        danger 
+                        onClick={() => deletePreset(preset.name)}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                
+                <Divider style={{ margin: '8px 0' }} />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <Input 
+                    placeholder="New preset name" 
+                    value={newPresetName} 
+                    onChange={e => setNewPresetName(e.target.value)}
+                    onPressEnter={savePreset}
+                  />
+                  <Button onClick={savePreset}>+</Button>
+                </div>
+              </div>
+            )}
+          >
+            <Button>Chart Presets <DownOutlined /></Button>
+          </Dropdown>
         </div>
-      ))}
+      )}
+
+      {/* Row with main and up to two others (max 3 total), equal widths */}
+      <div style={{ display: 'flex', gap: 16, alignItems: 'stretch', marginBottom: 16 }}>
+        {rowChartIds.map((id) => {
+          const ch = charts.find(c => c.id === id);
+          if (!ch) return null;
+          const widthPercent = 100 / Math.max(1, rowChartIds.length);
+          return (
+            <div
+              key={id}
+              style={{ flex: `0 0 ${widthPercent}%`, maxWidth: `${widthPercent}%` }}
+              draggable={id !== 'main'}
+              onDragStart={handleChartDragStart(id)}
+              onDragEnd={handleChartDragEnd}
+            >
+              <UnifiedChart 
+                dateRange={dateRange} 
+                collapsed={collapsed} 
+                chartId={id}
+                checks={ch.checks}
+                onChecksChange={(next) => updateChartChecks(id, next)}
+                onDelete={id !== 'main' ? () => deleteChart(id) : undefined}
+                axisType={axisType}
+              />
+            </div>
+          );
+        })}
+        {/* Right-of-main drop zone (only when dragging from column and there's space) */}
+        {canDropToRow && (
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={onDropToRow}
+            style={{
+              flex: `0 0 ${100 / (rowChartIds.length + 1)}%`,
+              maxWidth: `${100 / (rowChartIds.length + 1)}%`,
+              border: '2px dashed #1890ff',
+              borderRadius: 8,
+              minHeight: 80,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#1890ff'
+            }}
+          >
+            Drop here
+          </div>
+        )}
+      </div>
+
+      {/* Below-main drop zone (only when dragging from row, excluding main) */}
+      {canDropToColumn && (
+        <div
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={onDropToColumn}
+          style={{
+            border: '2px dashed #1890ff',
+            borderRadius: 8,
+            minHeight: 60,
+            marginBottom: 16,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#1890ff'
+          }}
+        >
+          Drop below main
+        </div>
+      )}
+
+      {/* Column below main: each chart full width */}
+      {columnChartIds.map((id) => {
+        const ch = charts.find(c => c.id === id);
+        if (!ch) return null;
+        return (
+          <div
+            key={id}
+            draggable
+            onDragStart={handleChartDragStart(id)}
+            onDragEnd={handleChartDragEnd}
+          >
+            <UnifiedChart 
+              dateRange={dateRange} 
+              collapsed={collapsed} 
+              chartId={id}
+              checks={ch.checks}
+              onChecksChange={(next) => updateChartChecks(id, next)}
+              onDelete={() => deleteChart(id)}
+              axisType={axisType}
+            />
+          </div>
+        );
+      })}
+
+      {/* Add chart button (visible when not collapsed) - moved to bottom */}
+      {!collapsed && (
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+          <Button 
+            type="dashed" 
+            icon={<PlusCircleOutlined />}
+            onClick={addChart}
+            style={{ borderStyle: 'dashed', borderColor: '#d9d9d9' }}
+          >
+            Add Chart
+          </Button>
+        </div>
+      )}
     </>
   );
 }
@@ -1009,6 +1460,7 @@ type Row = {
   sales: number;
   profit: number;
   promoCosts: number;
+  totalExpenses: number;
 };
 
 const extractAsin = (product: string) => product.split(' ')[0];
@@ -1028,14 +1480,52 @@ const extractProductData = (product: string) => {
 };
 
 const detailsRowsBase: Row[] = [
-  { key:'1', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQtJr-cqOx04hXoXD06NMfsGlB-UFxHD3rAaA&s', product:'B0AAA11111 (SKU: HVM-70001) Stainless Steel Toilet Brush and Holder – Matte Black', asin: 'B0AAA11111', blogger:'Иван Иванов', orders:0, clicks:0, conversion:0, rate:7, margin:15, spend:0, sales:0, profit:0, promoCosts: 0 },
-  { key:'2', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTpbMMyNkEN6q0bscf53nWBb3F3pXAJr11NfQ&s', product:'B0BBB22222 (SKU: HVM-70002) 720° Rotating Faucet Aerator – Splash-proof Smart Filter', asin: 'B0BBB22222', blogger:'Мария Смирнова', orders:1, clicks:15, conversion:6.7, rate:7, margin:53, spend:0, sales:12.64, profit:6.72, promoCosts: 2.50 },
-  { key:'3', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQKprCjvW5CbqPRI9Qt8DIHJVztC4FlWkoSfg&s', product:'B0CCC33333 (SKU: HVM-70003) Gold Toilet Brush and Holder – Brushed Stainless Steel', asin: 'B0CCC33333', blogger:'Иван Иванов', orders:2, clicks:30, conversion:6.7, rate:7, margin:53, spend:0, sales:25.28, profit:13.44, promoCosts: 5.00 },
-  { key:'4', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSJLGQ3xRxuRsEnru3EiWdylLg7GVaEESV8Yg&s', product:'B0DDD44444 (SKU: HVM-70004) Gold Toilet Brush and Holder – Deluxe Edition', asin: 'B0DDD44444', blogger:'Мария Смирнова', orders:1, clicks:15, conversion:6.7, rate:7, margin:53, spend:0, sales:12.64, profit:6.72, promoCosts: 2.50 },
+  { key:'1', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQtJr-cqOx04hXoXD06NMfsGlB-UFxHD3rAaA&s', product:'B0AAA11111 (SKU: HVM-70001) Stainless Steel Toilet Brush and Holder – Matte Black', asin: 'B0AAA11111', blogger:'Иван Иванов', orders:0, clicks:0, conversion:0, rate:7, margin:15, spend:0, sales:0, profit:0, promoCosts: 0, totalExpenses: 0 },
+  { key:'2', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTpbMMyNkEN6q0bscf53nWBb3F3pXAJr11NfQ&s', product:'B0BBB22222 (SKU: HVM-70002) 720° Rotating Faucet Aerator – Splash-proof Smart Filter', asin: 'B0BBB22222', blogger:'Мария Смирнова', orders:1, clicks:15, conversion:6.7, rate:7, margin:53, spend:0, sales:12.64, profit:6.72, promoCosts: 2.50, totalExpenses: 2.50 },
+  { key:'3', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQKprCjvW5CbqPRI9Qt8DIHJVztC4FlWkoSfg&s', product:'B0CCC33333 (SKU: HVM-70003) Gold Toilet Brush and Holder – Brushed Stainless Steel', asin: 'B0CCC33333', blogger:'Иван Иванов', orders:2, clicks:30, conversion:6.7, rate:7, margin:53, spend:0, sales:25.28, profit:13.44, promoCosts: 5.00, totalExpenses: 5.00 },
+  { key:'4', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSJLGQ3xRxuRsEnru3EiWdylLg7GVaEESV8Yg&s', product:'B0DDD44444 (SKU: HVM-70004) Gold Toilet Brush and Holder – Deluxe Edition', asin: 'B0DDD44444', blogger:'Мария Смирнова', orders:1, clicks:15, conversion:6.7, rate:7, margin:53, spend:0, sales:12.64, profit:6.72, promoCosts: 2.50, totalExpenses: 2.50 },
+  // Добавляем строки для Shopify (который есть в фильтрах, но отсутствует в таблицах)
+  { key:'5', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQtJr-cqOx04hXoXD06NMfsGlB-UFxHD3rAaA&s', product:'B0EEE55555 (SKU: HVM-70005) Premium Kitchen Faucet Filter – Advanced Filtration', asin: 'B0EEE55555', blogger:'Иван Иванов', orders:3, clicks:45, conversion:6.7, rate:7, margin:53, spend:0, sales:37.92, profit:20.16, promoCosts: 7.50, totalExpenses: 7.50 },
+  { key:'6', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTpbMMyNkEN6q0bscf53nWBb3F3pXAJr11NfQ&s', product:'B0FFF66666 (SKU: HVM-70006) Smart Water Filter System – Multi-Stage Purification', asin: 'B0FFF66666', blogger:'Мария Смирнова', orders:2, clicks:30, conversion:6.7, rate:7, margin:53, spend:0, sales:25.28, profit:13.44, promoCosts: 5.00, totalExpenses: 5.00 },
 ];
 
 // Initialize asinOptions now that detailsRowsBase is known
 asinOptions = Array.from(new Set(detailsRowsBase.map(r => r.asin))).map(a => ({ value: a, label: a }));
+
+// Create dynamic options from table data
+
+const getBloggerOptions = () => {
+  const bloggers = new Set<string>();
+  // Add bloggers from bloggerOptions
+  bloggerOptions.forEach(b => bloggers.add(b.value));
+  // Add bloggers from detailsRowsBase
+  detailsRowsBase.forEach(r => r.blogger && bloggers.add(r.blogger));
+  return Array.from(bloggers).map(b => ({ value: b, label: b }));
+};
+
+const getAsinOptions = () => {
+  const asins = new Set<string>();
+  // Add asins from detailsRowsBase
+  detailsRowsBase.forEach(r => asins.add(r.asin));
+  return Array.from(asins).map(a => ({ value: a, label: a }));
+};
+
+// Content table data for link options
+const contentRowsBase: ContentRow[] = [
+  { key: 'c1', asin: 'B0AAA11111', blogger: 'Иван Иванов', date: dayjs().subtract(1, 'day').format('YYYY-MM-DD'), campaign: 'Amazon', link: 'https://youtube.com/watch?v=abc123' },
+  { key: 'c2', asin: 'B0BBB22222', blogger: 'Мария Смирнова', date: dayjs().format('YYYY-MM-DD'), campaign: 'eBay', link: 'https://instagram.com/p/xyz789' },
+  { key: 'c3', asin: 'B0CCC33333', blogger: 'Иван Иванов', date: dayjs().subtract(2, 'day').format('YYYY-MM-DD'), campaign: 'Amazon', link: 'https://youtube.com/watch?v=def456' },
+  { key: 'c4', asin: 'B0DDD44444', blogger: 'Мария Смирнова', date: dayjs().subtract(3, 'day').format('YYYY-MM-DD'), campaign: 'eBay', link: 'https://instagram.com/p/ghi789' },
+  { key: 'c5', asin: 'B0EEE55555', blogger: 'Иван Иванов', date: dayjs().subtract(4, 'day').format('YYYY-MM-DD'), campaign: 'Shopify', link: 'https://youtube.com/watch?v=jkl012' },
+  { key: 'c6', asin: 'B0FFF66666', blogger: 'Мария Смирнова', date: dayjs().subtract(5, 'day').format('YYYY-MM-DD'), campaign: 'Shopify', link: 'https://instagram.com/p/mno345' },
+];
+
+const getLinkOptions = () => {
+  const links = new Set<string>();
+  // Add links from contentRowsBase
+  contentRowsBase.forEach(r => links.add(r.link));
+  return Array.from(links).map(l => ({ value: l, label: l }));
+};
 
 function TruncatedText({ text, style }: { text: string; style: React.CSSProperties }) {
   const [isOverflowing, setIsOverflowing] = React.useState(false);
@@ -1054,7 +1544,7 @@ function TruncatedText({ text, style }: { text: string; style: React.CSSProperti
   );
 
   return isOverflowing ? (
-    <Tooltip title={text} placement="topLeft">
+    <Tooltip title={text} placement="topLeft" trigger={["hover","focus"]}>
       {content}
     </Tooltip>
   ) : content;
@@ -1070,6 +1560,19 @@ function ProductNameTooltip({ text, style }: { text: string; style: React.CSSPro
     }
   }, [text]);
 
+  // Recalculate when column width changes (user resizes) using ResizeObserver
+  React.useEffect(() => {
+    const el = textRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      setIsOverflowing(el.scrollWidth > el.clientWidth);
+    });
+    ro.observe(el);
+    return () => {
+      try { ro.disconnect(); } catch {}
+    };
+  }, []);
+
   const defaultStyle: React.CSSProperties = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -1079,13 +1582,13 @@ function ProductNameTooltip({ text, style }: { text: string; style: React.CSSPro
   };
 
   const content = (
-    <div ref={textRef} style={defaultStyle}>
+    <div ref={textRef} style={defaultStyle} tabIndex={isOverflowing ? 0 : -1}>
       {text}
     </div>
   );
 
   return isOverflowing ? (
-    <Tooltip title={text} placement="topLeft">
+    <Tooltip title={text} placement="topLeft" trigger={["hover","focus"]}>
       {content}
     </Tooltip>
   ) : content;
@@ -1107,6 +1610,19 @@ function TruncatedTextWithTooltip({
     }
   }, [text]);
 
+  // Recalculate overflow on element resize (e.g., when user resizes column)
+  React.useEffect(() => {
+    const el = textRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      setIsOverflowing(el.scrollWidth > el.clientWidth);
+    });
+    ro.observe(el);
+    return () => {
+      try { ro.disconnect(); } catch {}
+    };
+  }, []);
+
   const defaultStyle: React.CSSProperties = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -1116,7 +1632,7 @@ function TruncatedTextWithTooltip({
   };
 
   const content = (
-    <div ref={textRef} style={defaultStyle}>
+    <div ref={textRef} style={defaultStyle} tabIndex={isOverflowing ? 0 : -1}>
       {text}
     </div>
   );
@@ -1146,6 +1662,18 @@ function TruncatedLinkWithTooltip({
     }
   }, [text]);
 
+  React.useEffect(() => {
+    const el = linkRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      setIsOverflowing(el.scrollWidth > el.clientWidth);
+    });
+    ro.observe(el);
+    return () => {
+      try { ro.disconnect(); } catch {}
+    };
+  }, []);
+
   const defaultStyle: React.CSSProperties = {
     color: '#1890ff', 
     textDecoration: 'none',
@@ -1165,13 +1693,14 @@ function TruncatedLinkWithTooltip({
       target="_blank" 
       rel="noreferrer"
       style={defaultStyle}
+      tabIndex={isOverflowing ? 0 : -1}
     >
       {text}
     </a>
   );
 
   return isOverflowing ? (
-    <Tooltip title={text} placement="topLeft">
+    <Tooltip title={text} placement="topLeft" trigger={["hover","focus"]}>
       {linkElement}
     </Tooltip>
   ) : linkElement;
@@ -1179,15 +1708,35 @@ function TruncatedLinkWithTooltip({
 
 function ColumnVisibilityControl({ 
   columnDefs, 
+  columnVisibility,
   onColumnVisibilityChange 
 }: { 
   columnDefs: any[]; 
+  columnVisibility: Record<string, boolean>;
   onColumnVisibilityChange: (colId: string, visible: boolean) => void;
 }) {
-  const [visibleColumns, setVisibleColumns] = React.useState<Set<string>>(
-    new Set(columnDefs.map(col => col.colId))
-  );
+  const [visibleColumns, setVisibleColumns] = React.useState<Set<string>>(() => {
+    const visible = new Set<string>();
+    columnDefs.forEach(col => {
+      // If columnVisibility[colId] is undefined or true, show column
+      if (columnVisibility[col.colId] !== false) {
+        visible.add(col.colId);
+      }
+    });
+    return visible;
+  });
   const [dropdownOpen, setDropdownOpen] = React.useState(false);
+
+  // Sync visibleColumns when columnVisibility changes
+  React.useEffect(() => {
+    const visible = new Set<string>();
+    columnDefs.forEach(col => {
+      if (columnVisibility[col.colId] !== false) {
+        visible.add(col.colId);
+      }
+    });
+    setVisibleColumns(visible);
+  }, [columnVisibility, columnDefs]);
 
   const handleColumnToggle = (colId: string, checked: boolean) => {
     const newVisibleColumns = new Set(visibleColumns);
@@ -1312,38 +1861,50 @@ function TablePresets({
       onOpenChange={setPresetsOpen}
       popupRender={() => (
         <div style={{ padding: 8, width: 280, background: '#ffffff', boxShadow: '0 6px 16px rgba(0,0,0,0.15)', border: '1px solid #D9D9D9', borderRadius: 8 }}>
-          <Typography.Text strong>Пресеты таблицы</Typography.Text>
           <div style={{ maxHeight: 220, overflowY: 'auto', marginTop: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 4px' }}>
-              <Button type="link" style={{ padding: 0 }} onClick={resetToDefault}>Сбросить</Button>
+              <Button type="link" style={{ padding: 0 }} onClick={resetToDefault}>Reset to Default</Button>
             </div>
             {presetsArray.length === 0 && <Typography.Text type="secondary">Нет пресетов</Typography.Text>}
             {presetsArray.map((preset: any, idx: number) => (
               <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 4px' }}>
                 <Button type="link" style={{ padding: 0 }} onClick={() => applyPreset(preset.name)}>{preset.name}</Button>
-                <Button size="small" danger onClick={() => deletePreset(preset.name)}>Удалить</Button>
+                <Button size="small" danger onClick={() => deletePreset(preset.name)}>Delete</Button>
               </div>
             ))}
           </div>
           <Divider style={{ margin: '8px 0' }} />
           <div style={{ display: 'flex', gap: 8 }}>
-            <Input placeholder="Название нового пресета" value={newPresetName} onChange={e => setNewPresetName(e.target.value)} />
+            <Input placeholder="New preset name" value={newPresetName} onChange={e => setNewPresetName(e.target.value)} />
             <Button onClick={savePreset}>+</Button>
           </div>
         </div>
       )}
     >
-      <Button>Presets <DownOutlined /></Button>
+      <Button>Table Presets <DownOutlined /></Button>
     </Dropdown>
   );
 }
 
 function DetailsTable({ filters }: { filters: { asin?: string; blogger?: string } }) {
   const [viewMode, setViewMode] = React.useState<'product' | 'blogger'>('product');
-  const [columnVisibility, setColumnVisibility] = React.useState<Record<string, boolean>>({});
+  const [columnVisibility, setColumnVisibility] = React.useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem('detailsColumnVisibility') || '{}'); } catch { return {}; }
+  });
   const [columnOrder, setColumnOrder] = React.useState<string[]>([]);
   const [columnWidths, setColumnWidths] = React.useState<Record<string, number>>({});
+  const [tableHeight, setTableHeight] = React.useState<'20' | '100'>(() => {
+    try { return JSON.parse(localStorage.getItem('detailsTableHeight') || '"20"'); } catch { return '20'; }
+  });
   const gridRef = React.useRef<AgGridReact>(null);
+
+  React.useEffect(() => {
+    try { localStorage.setItem('detailsColumnVisibility', JSON.stringify(columnVisibility)); } catch {}
+  }, [columnVisibility]);
+
+  React.useEffect(() => {
+    try { localStorage.setItem('detailsTableHeight', JSON.stringify(tableHeight)); } catch {}
+  }, [tableHeight]);
 
   const handleColumnVisibilityChange = (colId: string, visible: boolean) => {
     setColumnVisibility(prev => ({ ...prev, [colId]: visible }));
@@ -1486,19 +2047,20 @@ function DetailsTable({ filters }: { filters: { asin?: string; blogger?: string 
             <div style={{ 
               display: 'flex',
               flexDirection: 'column',
-              padding: '8px 0',
+              padding: '4px 0',
               height: '100%',
-              minHeight: '80px'
+              minHeight: '56px',
+              minWidth: 0
             }}>
               {/* Верхняя строка - название продукта */}
-              <div style={{ marginBottom: '8px' }}>
-                <ProductNameTooltip 
+              <div style={{ marginBottom: '4px', minWidth: 0 }}>
+                <TruncatedTextWithTooltip 
                   text={name}
                   style={{
                     fontWeight: 500,
                     fontSize: 14,
                     color: '#262626',
-                    lineHeight: '18px'
+                    lineHeight: '16px'
                   }}
                 />
               </div>
@@ -1507,15 +2069,16 @@ function DetailsTable({ filters }: { filters: { asin?: string; blogger?: string 
               <div style={{ 
                 display: 'flex',
                 alignItems: 'flex-start',
-                gap: '8px',
-                flex: 1
+                gap: '6px',
+                flex: 1,
+                minWidth: 0
               }}>
                 {/* Фото продукта */}
                 <img 
                   src={r.img} 
                   style={{ 
-                    width: 40, 
-                    height: 40, 
+                    width: 32, 
+                    height: 32, 
                     objectFit: 'cover', 
                     borderRadius: 4,
                     flexShrink: 0
@@ -1528,15 +2091,16 @@ function DetailsTable({ filters }: { filters: { asin?: string; blogger?: string 
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
-                  height: '40px',
-                  flex: 1
+                  height: '32px',
+                  flex: 1,
+                  minWidth: 0
                 }}>
                   {/* Средняя строка - ASIN */}
                   <div style={{ 
                     fontSize: 13, 
                     color: '#595959',
                     fontWeight: 500,
-                    lineHeight: '18px'
+                    lineHeight: '16px'
                   }}>
                     {asin}
                   </div>
@@ -1545,7 +2109,7 @@ function DetailsTable({ filters }: { filters: { asin?: string; blogger?: string 
                   <div style={{ 
                     fontSize: 12, 
                     color: '#8c8c8c',
-                    lineHeight: '18px'
+                    lineHeight: '16px'
                   }}>
                     SKU: {sku}
                   </div>
@@ -1565,12 +2129,13 @@ function DetailsTable({ filters }: { filters: { asin?: string; blogger?: string 
     { headerName: 'Promotional costs, $', field: 'promoCosts', colId: 'promoCosts', flex: 1, minWidth: 140, sortable: true, filter: 'agNumberColumnFilter', hide: columnVisibility['promoCosts'] === false },
     { headerName: 'Sales, $', field: 'sales', colId: 'sales', flex: 1, minWidth: 100, sortable: true, filter: 'agNumberColumnFilter', hide: columnVisibility['sales'] === false },
     { headerName: 'Profit, $', field: 'profit', colId: 'profit', flex: 1, minWidth: 100, sortable: true, filter: 'agNumberColumnFilter', hide: columnVisibility['profit'] === false },
+    { headerName: 'Total expenses, $', field: 'totalExpenses', colId: 'totalExpenses', flex: 1, minWidth: 120, sortable: true, filter: 'agNumberColumnFilter', hide: columnVisibility['totalExpenses'] === false },
   ] as any;
 
   const filtered = React.useMemo(() => {
     return detailsRowsBase.filter(r => {
       if (filters.asin && r.asin !== filters.asin) return false;
-      if (viewMode === 'blogger' && filters.blogger && r.blogger !== filters.blogger) return false;
+      if (filters.blogger && r.blogger !== filters.blogger) return false;
       return true;
     });
   }, [filters.asin, filters.blogger, viewMode]);
@@ -1593,15 +2158,30 @@ function DetailsTable({ filters }: { filters: { asin?: string; blogger?: string 
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
           <h4 style={{ margin: 0 }}>Details Table:</h4>
-          <TablePresets 
-            tableId="details" 
-            onPresetChange={handlePresetChange}
-            onSavePreset={saveCurrentSettings}
-          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '14px', color: '#666' }}>Rows:</span>
+              <Radio.Group 
+                size="small" 
+                value={tableHeight} 
+                onChange={(e) => setTableHeight(e.target.value)}
+                buttonStyle="solid"
+              >
+                <Radio.Button value="20">20</Radio.Button>
+                <Radio.Button value="100">100</Radio.Button>
+              </Radio.Group>
+            </div>
+            <TablePresets 
+              tableId="details" 
+              onPresetChange={handlePresetChange}
+              onSavePreset={saveCurrentSettings}
+            />
+          </div>
         </div>
-        <div className="ag-theme-alpine" style={{ width: '100%', position: 'relative' }}>
+        <div className="ag-theme-alpine" style={{ width: '100%', height: tableHeight === '20' ? '1340px' : '6700px', position: 'relative' }}>
           <ColumnVisibilityControl 
             columnDefs={columnDefs}
+            columnVisibility={columnVisibility}
             onColumnVisibilityChange={handleColumnVisibilityChange}
           />
           <style>{`
@@ -1612,6 +2192,7 @@ function DetailsTable({ filters }: { filters: { asin?: string; blogger?: string 
               display: flex !important;
               align-items: center !important;
               justify-content: flex-start !important;
+              padding: 2px 8px !important;
             }
             .ag-theme-alpine .ag-cell-wrapper {
               display: flex !important;
@@ -1625,13 +2206,12 @@ function DetailsTable({ filters }: { filters: { asin?: string; blogger?: string 
             columnDefs={columnDefs}
             theme="legacy"
             pagination={true}
-            paginationPageSize={10}
+            paginationPageSize={20}
             paginationPageSizeSelector={[10, 20, 50, 100]}
             suppressHorizontalScroll={false}
             suppressColumnVirtualisation={true}
-            suppressRowVirtualisation={true}
-            domLayout="autoHeight"
-            rowHeight={96}
+            suppressRowVirtualisation={false}
+            rowHeight={64}
             defaultColDef={{
               resizable: true,
               sortable: true,
@@ -1650,20 +2230,126 @@ function DetailsTable({ filters }: { filters: { asin?: string; blogger?: string 
 }
 
 export default function App() {
-  const [visibleKeys, setVisibleKeys] = React.useState<string[]>(allMetrics as string[]);
-  const [tileOrder, setTileOrder] = React.useState<string[]>(allMetrics as string[]);
+  const [visibleKeys, setVisibleKeys] = React.useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('visibleKeys') || JSON.stringify(allMetrics)); } catch { return allMetrics as string[]; }
+  });
+  const [tileOrder, setTileOrder] = React.useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('tileOrder') || JSON.stringify(allMetrics)); } catch { return allMetrics as string[]; }
+  });
   const [tilesPresets, setTilesPresets] = React.useState<{name:string; visibleTiles:string[]; tileOrder:string[]}[]>(
     () => { try { return JSON.parse(localStorage.getItem('tilesPresets') || '[]'); } catch { return []; } }
   );
   const [newPresetName, setNewPresetName] = React.useState('');
   const [presetsOpen, setPresetsOpen] = React.useState(false);
   const [settingsOpen, setSettingsOpen] = React.useState(false);
-  const [dateRange, setDateRange] = React.useState<[Dayjs, Dayjs] | null>(null);
-  const [showDetails, setShowDetails] = React.useState<boolean>(false);
-  const [selectedCompany, setSelectedCompany] = React.useState<string | undefined>(undefined);
-  const [selectedBlogger, setSelectedBlogger] = React.useState<string | undefined>(undefined);
-  const [selectedAsin, setSelectedAsin] = React.useState<string | undefined>(undefined);
-  const [selectedLink, setSelectedLink] = React.useState<string | undefined>(undefined);
+  const [dateRange, setDateRange] = React.useState<[Dayjs, Dayjs] | null>(() => {
+    try { 
+      const saved = localStorage.getItem('dateRange');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return [dayjs(parsed[0]), dayjs(parsed[1])];
+      }
+      return null;
+    } catch { return null; }
+  });
+  const [axisType, setAxisType] = React.useState<'day' | 'week' | 'month'>(() => {
+    try { return (localStorage.getItem('axisType') as 'day' | 'week' | 'month') || 'day'; } catch { return 'day'; }
+  });
+  const [showDetails, setShowDetails] = React.useState<boolean>(() => {
+    try { return JSON.parse(localStorage.getItem('showDetails') || 'false'); } catch { return false; }
+  });
+  const [selectedCompany, setSelectedCompany] = React.useState<string | undefined>(() => {
+    try { return localStorage.getItem('selectedCompany') || undefined; } catch { return undefined; }
+  });
+  const [selectedBlogger, setSelectedBlogger] = React.useState<string | undefined>(() => {
+    try { return localStorage.getItem('selectedBlogger') || undefined; } catch { return undefined; }
+  });
+  const [selectedAsin, setSelectedAsin] = React.useState<string | undefined>(() => {
+    try { return localStorage.getItem('selectedAsin') || undefined; } catch { return undefined; }
+  });
+  const [selectedLink, setSelectedLink] = React.useState<string | undefined>(() => {
+    try { return localStorage.getItem('selectedLink') || undefined; } catch { return undefined; }
+  });
+
+  // Calculate radio button availability based on selected period
+  const getAxisTypeAvailability = React.useCallback(() => {
+    if (!dateRange) return { day: false, week: false, month: false };
+    
+    const isDefault = isDefaultPreset(dateRange);
+    if (isDefault) return { day: false, week: false, month: false };
+    
+    const [start, end] = dateRange;
+    const diffInDays = end.diff(start, 'day') + 1;
+    
+    return {
+      day: true,
+      week: diffInDays > 7,
+      month: diffInDays > 31
+    };
+  }, [dateRange]);
+
+  const axisAvailability = getAxisTypeAvailability();
+
+  // Reset axis type when it becomes unavailable
+  React.useEffect(() => {
+    if (!axisAvailability[axisType]) {
+      if (axisAvailability.day) setAxisType('day');
+      else if (axisAvailability.week) setAxisType('week');
+      else if (axisAvailability.month) setAxisType('month');
+    }
+  }, [axisAvailability, axisType]);
+
+  // Save filters state to localStorage
+  React.useEffect(() => {
+    try { localStorage.setItem('showDetails', JSON.stringify(showDetails)); } catch {}
+  }, [showDetails]);
+
+  React.useEffect(() => {
+    try { 
+      if (selectedCompany) localStorage.setItem('selectedCompany', selectedCompany);
+      else localStorage.removeItem('selectedCompany');
+    } catch {}
+  }, [selectedCompany]);
+
+  React.useEffect(() => {
+    try { 
+      if (selectedBlogger) localStorage.setItem('selectedBlogger', selectedBlogger);
+      else localStorage.removeItem('selectedBlogger');
+    } catch {}
+  }, [selectedBlogger]);
+
+  React.useEffect(() => {
+    try { 
+      if (selectedAsin) localStorage.setItem('selectedAsin', selectedAsin);
+      else localStorage.removeItem('selectedAsin');
+    } catch {}
+  }, [selectedAsin]);
+
+  React.useEffect(() => {
+    try { 
+      if (selectedLink) localStorage.setItem('selectedLink', selectedLink);
+      else localStorage.removeItem('selectedLink');
+    } catch {}
+  }, [selectedLink]);
+
+  React.useEffect(() => {
+    try { 
+      if (dateRange) localStorage.setItem('dateRange', JSON.stringify([dateRange[0].toISOString(), dateRange[1].toISOString()]));
+      else localStorage.removeItem('dateRange');
+    } catch {}
+  }, [dateRange]);
+
+  React.useEffect(() => {
+    try { localStorage.setItem('axisType', axisType); } catch {}
+  }, [axisType]);
+
+  React.useEffect(() => {
+    try { localStorage.setItem('visibleKeys', JSON.stringify(visibleKeys)); } catch {}
+  }, [visibleKeys]);
+
+  React.useEffect(() => {
+    try { localStorage.setItem('tileOrder', JSON.stringify(tileOrder)); } catch {}
+  }, [tileOrder]);
 
   const savePresets = (next: typeof tilesPresets) => {
     setTilesPresets(next);
@@ -1675,7 +2361,7 @@ export default function App() {
     label: (
       <Checkbox
         onClick={e => e.stopPropagation()}
-        defaultChecked={(visibleKeys as string[]).includes(m as string)}
+        checked={(visibleKeys as string[]).includes(m as string)}
         onChange={e => {
           const next = new Set(visibleKeys);
           if (e.target.checked) next.add(m as string); else next.delete(m as string);
@@ -1721,15 +2407,15 @@ export default function App() {
     <ConfigProvider theme={appTheme}>
       <Layout style={{ minHeight: '100vh' }}>
         <Header style={{ background: 'transparent', padding: 0 }}>
-          <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 12px' }}>
+          <div style={{ maxWidth: 1614, margin: '0 auto', padding: '0 12px' }}>
             <Typography.Title level={2} style={{ margin: '24px 0 20px' }}>Dashboard</Typography.Title>
           </div>
         </Header>
         <Content>
-          <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 12px' }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 15, marginBottom: 20, alignItems: 'center' }}>
+          <div style={{ maxWidth: 1614, margin: '0 auto', padding: '0 12px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18, marginBottom: 20, alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
               <Select
-                style={{ minWidth: 180 }}
+                style={{ minWidth: 320 }}
                 options={companyOptions}
                 showSearch
                 allowClear
@@ -1738,23 +2424,42 @@ export default function App() {
                 onChange={(v) => setSelectedCompany(v)}
                 filterOption={(input, option) => (String(option?.value || '')).toLowerCase().includes(input.toLowerCase())}
               />
-              <Select style={{ minWidth: 180 }} options={bloggerOptions} showSearch allowClear placeholder="Blogger" value={selectedBlogger} onChange={(v) => setSelectedBlogger(v)} />
-              <Select style={{ minWidth: 180 }} options={asinOptions} showSearch allowClear placeholder="ASIN" value={selectedAsin} onChange={(v) => setSelectedAsin(v)} />
-              {/* Content link select removed by request */}
+              <Select style={{ minWidth: 320 }} options={getBloggerOptions()} showSearch allowClear placeholder="Blogger" value={selectedBlogger} onChange={(v) => setSelectedBlogger(v)} />
+              <Select style={{ minWidth: 180 }} options={getAsinOptions()} showSearch allowClear placeholder="ASIN" value={selectedAsin} onChange={(v) => setSelectedAsin(v)} />
               <RangePicker
                 format="DD.MM.YYYY"
                 presets={[
-                  { label: 'Сегодня', value: [dayjs().startOf('day'), dayjs().endOf('day')] },
-                  { label: 'Вчера', value: [dayjs().subtract(1, 'day').startOf('day'), dayjs().subtract(1, 'day').endOf('day')] },
-                  { label: 'Эта неделя', value: [dayjs().startOf('week'), dayjs().endOf('week')] },
-                  { label: 'Прошлая неделя', value: [dayjs().subtract(1, 'week').startOf('week'), dayjs().subtract(1, 'week').endOf('week')] },
-                  { label: 'Этот месяц', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
-                  { label: 'Прошлый месяц', value: [dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')] },
-                  { label: 'Сентябрь 2025', value: [dayjs('2025-09-01').startOf('day'), dayjs('2025-09-30').endOf('day')] },
-                  { label: 'Последние 3 месяца', value: [dayjs().subtract(3, 'month').startOf('month'), dayjs().endOf('month')] },
+                  { label: 'Today', value: [dayjs().startOf('day'), dayjs().endOf('day')] },
+                  { label: 'Yesterday', value: [dayjs().subtract(1, 'day').startOf('day'), dayjs().subtract(1, 'day').endOf('day')] },
+                  { label: 'This Week', value: [dayjs().startOf('week'), dayjs().endOf('week')] },
+                  { label: 'Last Week', value: [dayjs().subtract(1, 'week').startOf('week'), dayjs().subtract(1, 'week').endOf('week')] },
+                  { label: 'This Month', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
+                  { label: 'Last Month', value: [dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')] },
+                  { label: 'September 2025', value: [dayjs('2025-09-01').startOf('day'), dayjs('2025-09-30').endOf('day')] },
+                  { label: 'Last 3 Months', value: [dayjs().subtract(3, 'month').startOf('month'), dayjs().endOf('month')] },
                 ]}
                 value={dateRange as any}
                 onChange={(v) => setDateRange((v && v[0] && v[1]) ? [v[0], v[1]] : null)}
+                renderExtraFooter={() => (
+                  <div style={{ padding: '8px 16px', borderTop: '1px solid #f0f0f0' }}>
+                    <Radio.Group 
+                      size="small" 
+                      value={axisType} 
+                      onChange={(e) => setAxisType(e.target.value)}
+                      style={{ display: 'flex', justifyContent: 'center', gap: 4 }}
+                    >
+                      <Radio.Button value="day" disabled={!axisAvailability.day}>
+                        Day
+                      </Radio.Button>
+                      <Radio.Button value="week" disabled={!axisAvailability.week}>
+                        Week
+                      </Radio.Button>
+                      <Radio.Button value="month" disabled={!axisAvailability.month}>
+                        Month
+                      </Radio.Button>
+                    </Radio.Group>
+                  </div>
+                )}
               />
               <Dropdown menu={{ items }} open={settingsOpen} onOpenChange={setSettingsOpen} trigger={["click"]}>
                 <Button>⚙️ <DownOutlined /></Button>
@@ -1765,10 +2470,9 @@ export default function App() {
                 onOpenChange={setPresetsOpen}
                 popupRender={() => (
                   <div style={{ padding: 8, width: 280, background: '#ffffff', boxShadow: '0 6px 16px rgba(0,0,0,0.15)', border: '1px solid #D9D9D9', borderRadius: 8 }}>
-                    <Typography.Text strong>Presets</Typography.Text>
                     <div style={{ maxHeight: 220, overflowY: 'auto', marginTop: 8 }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 4px' }}>
-                        <Button type="link" style={{ padding: 0 }} onClick={() => { setVisibleKeys(allMetrics as string[]); setTileOrder(allMetrics as string[]); setPresetsOpen(false); }}>None</Button>
+                        <Button type="link" style={{ padding: 0 }} onClick={() => { setVisibleKeys(allMetrics as string[]); setTileOrder(allMetrics as string[]); setPresetsOpen(false); }}>Reset to Default</Button>
                       </div>
                       {tilesPresets.length === 0 && <Typography.Text type="secondary">Нет пресетов</Typography.Text>}
                       {tilesPresets.map((p, idx) => (
@@ -1778,13 +2482,13 @@ export default function App() {
                             const next = tilesPresets.slice();
                             next.splice(idx, 1);
                             savePresets(next);
-                          }}>Удалить</Button>
+                          }}>Delete</Button>
                         </div>
                       ))}
                     </div>
                     <Divider style={{ margin: '8px 0' }} />
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <Input placeholder="Название нового пресета" value={newPresetName} onChange={e => setNewPresetName(e.target.value)} />
+                      <Input placeholder="New preset name" value={newPresetName} onChange={e => setNewPresetName(e.target.value)} />
                       <Button onClick={() => {
                         const name = newPresetName.trim();
                         if (!name) return;
@@ -1798,10 +2502,27 @@ export default function App() {
                   </div>
                 )}
               >
-                <Button>Presets <DownOutlined /></Button>
+                <Button>Tiles Presets <DownOutlined /></Button>
               </Dropdown>
 
-              <Button type="primary" onClick={() => setShowDetails(v => !v)}>Details</Button>
+              <Button 
+                type="primary"
+                onClick={() => setShowDetails(v => !v)}
+                style={{
+                  backgroundColor: showDetails ? '#1890ff' : '#1890ff',
+                  borderColor: showDetails ? '#1890ff' : '#1890ff',
+                  color: '#ffffff',
+                  boxShadow: showDetails 
+                    ? 'inset 0 4px 8px rgba(0,0,0,0.3), inset 0 1px 2px rgba(0,0,0,0.2), 0 1px 1px rgba(0,0,0,0.1)' 
+                    : '0 4px 8px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.1)',
+                  transform: showDetails ? 'translateY(2px)' : 'translateY(0)',
+                  transition: 'all 0.2s ease',
+                  border: showDetails ? '1px solid #1890ff' : '1px solid #1890ff',
+                  borderRadius: '20px'
+                }}
+              >
+                Details
+              </Button>
             </div>
 
             <div style={{
@@ -1820,7 +2541,7 @@ export default function App() {
             </div>
 
             <div style={{ position: 'relative' }}>
-              <ChartsBlock dateRange={dateRange} />
+              <ChartsBlock dateRange={dateRange} axisType={axisType} />
               <SummaryToggle dateRange={dateRange} />
               <SummaryPanel dateRange={dateRange} />
             </div>
@@ -1857,16 +2578,26 @@ function ContentTableCard({ filters, dateRange }: { filters: { company?: string;
   const [collapsed, setCollapsed] = React.useState<boolean>(() => {
     try { return JSON.parse(localStorage.getItem('contentCollapsed') || 'false'); } catch { return false; }
   });
-  const [columnVisibility, setColumnVisibility] = React.useState<Record<string, boolean>>({});
+  const [columnVisibility, setColumnVisibility] = React.useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem('contentColumnVisibility') || '{}'); } catch { return {}; }
+  });
   const [columnOrder, setColumnOrder] = React.useState<string[]>([]);
   const [columnWidths, setColumnWidths] = React.useState<Record<string, number>>({});
+  const [tableHeight, setTableHeight] = React.useState<'20' | '100'>(() => {
+    try { return JSON.parse(localStorage.getItem('contentTableHeight') || '"20"'); } catch { return '20'; }
+  });
   const gridRef = React.useRef<AgGridReact>(null);
   React.useEffect(() => { localStorage.setItem('contentCollapsed', JSON.stringify(collapsed)); }, [collapsed]);
 
-  const allRows: ContentRow[] = React.useMemo(() => ([
-    { key: 'c1', asin: 'B00123456', blogger: 'Иван Иванов', date: dayjs().subtract(1, 'day').format('YYYY-MM-DD'), campaign: 'Amazon', link: 'https://youtube.com/watch?v=abc123' },
-    { key: 'c2', asin: 'C00987654', blogger: 'Мария Смирнова', date: dayjs().format('YYYY-MM-DD'), campaign: 'eBay', link: 'https://instagram.com/p/xyz789' },
-  ]), []);
+  React.useEffect(() => {
+    try { localStorage.setItem('contentColumnVisibility', JSON.stringify(columnVisibility)); } catch {}
+  }, [columnVisibility]);
+
+  React.useEffect(() => {
+    try { localStorage.setItem('contentTableHeight', JSON.stringify(tableHeight)); } catch {}
+  }, [tableHeight]);
+
+  const allRows: ContentRow[] = React.useMemo(() => contentRowsBase, []);
 
   const rows = React.useMemo(() => {
     return allRows.filter(r => {
@@ -2100,15 +2831,30 @@ function ContentTableCard({ filters, dateRange }: { filters: { company?: string;
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <h4 style={{ margin: 0 }}>Content Table:</h4>
-              <TablePresets 
-                tableId="content" 
-                onPresetChange={handlePresetChange}
-                onSavePreset={saveCurrentSettings}
-              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '14px', color: '#666' }}>Rows:</span>
+                  <Radio.Group 
+                    size="small" 
+                    value={tableHeight} 
+                    onChange={(e) => setTableHeight(e.target.value)}
+                    buttonStyle="solid"
+                  >
+                    <Radio.Button value="20">20</Radio.Button>
+                    <Radio.Button value="100">100</Radio.Button>
+                  </Radio.Group>
+                </div>
+                <TablePresets 
+                  tableId="content" 
+                  onPresetChange={handlePresetChange}
+                  onSavePreset={saveCurrentSettings}
+                />
+              </div>
             </div>
-            <div className="ag-theme-alpine" style={{ width: '100%', position: 'relative' }}>
+            <div className="ag-theme-alpine" style={{ width: '100%', height: tableHeight === '20' ? '700px' : '3500px', position: 'relative' }}>
               <ColumnVisibilityControl 
                 columnDefs={columnDefs}
+                columnVisibility={columnVisibility}
                 onColumnVisibilityChange={handleColumnVisibilityChange}
               />
               <style>{`
@@ -2132,12 +2878,11 @@ function ContentTableCard({ filters, dateRange }: { filters: { company?: string;
                 columnDefs={columnDefs}
                 theme="legacy"
                 pagination={true}
-                paginationPageSize={10}
+                paginationPageSize={20}
                 paginationPageSizeSelector={[10, 20, 50, 100]}
                 suppressHorizontalScroll={false}
                 suppressColumnVirtualisation={true}
-                suppressRowVirtualisation={true}
-                domLayout="autoHeight"
+                suppressRowVirtualisation={false}
                 defaultColDef={{
                   resizable: true,
                   sortable: true,
