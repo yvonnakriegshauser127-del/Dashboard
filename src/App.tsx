@@ -1028,15 +1028,6 @@ function UnifiedChart({
   );
 }
 
-function CollapseCharts() {
-  const [collapsed, setCollapsed] = React.useState<boolean>(() => {
-    try { return JSON.parse(localStorage.getItem('chartsCollapsed') || 'false'); } catch { return false; }
-  });
-  React.useEffect(() => { localStorage.setItem('chartsCollapsed', JSON.stringify(collapsed)); }, [collapsed]);
-  return (
-    <Button onClick={() => setCollapsed(v => !v)}>{collapsed ? 'Expand charts' : 'Collapse charts'}</Button>
-  );
-}
 
 type ChartPreset = {
   name: string;
@@ -1116,6 +1107,10 @@ function ChartsBlock({ dateRange, axisType }: { dateRange: [Dayjs, Dayjs] | null
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
+
+  React.useEffect(() => {
+    try { localStorage.setItem('chartsCollapsed', JSON.stringify(collapsed)); } catch {}
+  }, [collapsed]);
 
   // Save charts state
   React.useEffect(() => {
@@ -1268,9 +1263,19 @@ function ChartsBlock({ dateRange, axisType }: { dateRange: [Dayjs, Dayjs] | null
   };
 
   return (
-    <>
-      {/* Presets dropdown */}
+    <Card
+      title="Charts"
+      style={{ maxWidth: 1600, margin: '0 auto' }}
+      styles={{ body: collapsed ? { display: 'none', padding: 0 } : undefined }}
+      extra={
+        <Button type="text" onClick={() => setCollapsed(v => !v)}>
+          {collapsed ? <DownOutlined /> : <UpOutlined />}
+        </Button>
+      }
+    >
       {!collapsed && (
+        <>
+          {/* Presets dropdown */}
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
           <Dropdown
             open={presetsOpen}
@@ -1334,9 +1339,8 @@ function ChartsBlock({ dateRange, axisType }: { dateRange: [Dayjs, Dayjs] | null
             <Button>Chart Presets <DownOutlined /></Button>
           </Dropdown>
         </div>
-      )}
 
-      {/* Row with main and up to two others (max 3 total), equal widths */}
+        {/* Row with main and up to two others (max 3 total), equal widths */}
       <div style={{ display: 'flex', gap: 16, alignItems: 'stretch', marginBottom: 16 }}>
         {rowChartIds.map((id) => {
           const ch = charts.find(c => c.id === id);
@@ -1428,20 +1432,20 @@ function ChartsBlock({ dateRange, axisType }: { dateRange: [Dayjs, Dayjs] | null
         );
       })}
 
-      {/* Add chart button (visible when not collapsed) - moved to bottom */}
-      {!collapsed && (
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-          <Button 
-            type="dashed" 
-            icon={<PlusCircleOutlined />}
-            onClick={addChart}
-            style={{ borderStyle: 'dashed', borderColor: '#d9d9d9' }}
-          >
-            Add Chart
-          </Button>
-        </div>
+          {/* Add chart button (visible when not collapsed) - moved to bottom */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+            <Button 
+              type="dashed" 
+              icon={<PlusCircleOutlined />}
+              onClick={addChart}
+              style={{ borderStyle: 'dashed', borderColor: '#d9d9d9' }}
+            >
+              Add Chart
+            </Button>
+          </div>
+        </>
       )}
-    </>
+    </Card>
   );
 }
 
@@ -1886,7 +1890,10 @@ function TablePresets({
   );
 }
 
-function DetailsTable({ filters }: { filters: { asin?: string; blogger?: string } }) {
+function DetailsTable({ filters, onShowContent }: { 
+  filters: { asin?: string; blogger?: string }; 
+  onShowContent: (filter: { type: 'blogger' | 'product'; value: string }) => void;
+}) {
   const [viewMode, setViewMode] = React.useState<'product' | 'blogger'>('product');
   const [columnVisibility, setColumnVisibility] = React.useState<Record<string, boolean>>(() => {
     try { return JSON.parse(localStorage.getItem('detailsColumnVisibility') || '{}'); } catch { return {}; }
@@ -1897,6 +1904,15 @@ function DetailsTable({ filters }: { filters: { asin?: string; blogger?: string 
     try { return JSON.parse(localStorage.getItem('detailsTableHeight') || '"20"'); } catch { return '20'; }
   });
   const gridRef = React.useRef<AgGridReact>(null);
+  
+  // Context menu state
+  const [contextMenu, setContextMenu] = React.useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    type: 'blogger' | 'product';
+    value: string;
+  } | null>(null);
 
   React.useEffect(() => {
     try { localStorage.setItem('detailsColumnVisibility', JSON.stringify(columnVisibility)); } catch {}
@@ -2031,27 +2047,45 @@ function DetailsTable({ filters }: { filters: { asin?: string; blogger?: string 
       hide: columnVisibility['productOrBlogger'] === false,
       cellRenderer: (params: any) => {
         const r = params.data as Row;
+        
+        const handleContextMenu = (e: React.MouseEvent) => {
+          e.preventDefault();
+          const value = viewMode === 'blogger' ? (r.blogger || '') : r.product;
+          setContextMenu({
+            visible: true,
+            x: e.clientX,
+            y: e.clientY,
+            type: viewMode === 'blogger' ? 'blogger' : 'product',
+            value: value
+          });
+        };
+        
         if (viewMode === 'blogger') {
           return (
-            <TruncatedTextWithTooltip 
-              text={r.blogger || ''}
-              style={{
-                fontSize: '14px',
-                color: '#262626'
-              }}
-            />
+            <div onContextMenu={handleContextMenu} style={{ width: '100%', height: '100%', cursor: 'context-menu' }}>
+              <TruncatedTextWithTooltip 
+                text={r.blogger || ''}
+                style={{
+                  fontSize: '14px',
+                  color: '#262626'
+                }}
+              />
+            </div>
           );
         } else {
           const { asin, sku, name } = extractProductData(r.product);
           return (
-            <div style={{ 
-              display: 'flex',
-              flexDirection: 'column',
-              padding: '4px 0',
-              height: '100%',
-              minHeight: '56px',
-              minWidth: 0
-            }}>
+            <div 
+              onContextMenu={handleContextMenu}
+              style={{ 
+                display: 'flex',
+                flexDirection: 'column',
+                padding: '4px 0',
+                height: '100%',
+                minHeight: '56px',
+                minWidth: 0,
+                cursor: 'context-menu'
+              }}>
               {/* Верхняя строка - название продукта */}
               <div style={{ marginBottom: '4px', minWidth: 0 }}>
                 <TruncatedTextWithTooltip 
@@ -2225,6 +2259,65 @@ function DetailsTable({ filters }: { filters: { asin?: string; blogger?: string 
           />
         </div>
       </div>
+      
+      {/* Context Menu */}
+      {contextMenu && (
+        <>
+          <div 
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 999
+            }}
+            onClick={() => setContextMenu(null)}
+          />
+          <div
+            style={{
+              position: 'fixed',
+              top: contextMenu.y,
+              left: contextMenu.x,
+              background: '#fff',
+              border: '1px solid #d9d9d9',
+              borderRadius: '6px',
+              boxShadow: '0 6px 16px 0 rgba(0, 0, 0, 0.08)',
+              zIndex: 1000,
+              minWidth: '140px'
+            }}
+          >
+            <div
+              style={{
+                padding: '8px 12px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                color: '#000000d9',
+                borderRadius: '6px'
+              }}
+              onMouseEnter={(e) => {
+                (e.target as HTMLElement).style.backgroundColor = '#f5f5f5';
+              }}
+              onMouseLeave={(e) => {
+                (e.target as HTMLElement).style.backgroundColor = 'transparent';
+              }}
+              onClick={() => {
+                const filterValue = contextMenu.type === 'blogger' 
+                  ? contextMenu.value 
+                  : extractProductData(contextMenu.value).asin;
+                
+                onShowContent({
+                  type: contextMenu.type,
+                  value: filterValue
+                });
+                setContextMenu(null);
+              }}
+            >
+              Show info
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -2270,6 +2363,9 @@ export default function App() {
   const [selectedLink, setSelectedLink] = React.useState<string | undefined>(() => {
     try { return localStorage.getItem('selectedLink') || undefined; } catch { return undefined; }
   });
+  
+  // Individual filter state for Content table
+  const [individualFilter, setIndividualFilter] = React.useState<{ type: 'blogger' | 'product'; value: string } | null>(null);
 
   // Calculate radio button availability based on selected period
   const getAxisTypeAvailability = React.useCallback(() => {
@@ -2331,6 +2427,13 @@ export default function App() {
       else localStorage.removeItem('selectedLink');
     } catch {}
   }, [selectedLink]);
+
+  // Reset individual filter when global filters change
+  React.useEffect(() => {
+    if (individualFilter) {
+      setIndividualFilter(null);
+    }
+  }, [selectedCompany, selectedBlogger, selectedAsin, selectedLink, dateRange]);
 
   React.useEffect(() => {
     try { 
@@ -2548,7 +2651,10 @@ export default function App() {
 
             {showDetails && (
               <div style={{ marginTop: 16 }}>
-                <DetailsTable filters={{ asin: selectedAsin, blogger: selectedBlogger }} />
+                <DetailsTable 
+                  filters={{ asin: selectedAsin, blogger: selectedBlogger }} 
+                  onShowContent={setIndividualFilter}
+                />
               </div>
             )}
 
@@ -2556,6 +2662,8 @@ export default function App() {
               <ContentTableCard
                 filters={{ company: selectedCompany, blogger: selectedBlogger, asin: selectedAsin, link: selectedLink }}
                 dateRange={dateRange}
+                individualFilter={individualFilter}
+                onClearIndividualFilter={() => setIndividualFilter(null)}
               />
             </div>
           </div>
@@ -2574,7 +2682,17 @@ type ContentRow = {
   link: string;
 };
 
-function ContentTableCard({ filters, dateRange }: { filters: { company?: string; blogger?: string; asin?: string; link?: string }; dateRange: [Dayjs, Dayjs] | null }) {
+function ContentTableCard({ 
+  filters, 
+  dateRange, 
+  individualFilter, 
+  onClearIndividualFilter 
+}: { 
+  filters: { company?: string; blogger?: string; asin?: string; link?: string }; 
+  dateRange: [Dayjs, Dayjs] | null;
+  individualFilter: { type: 'blogger' | 'product'; value: string } | null;
+  onClearIndividualFilter: () => void;
+}) {
   const [collapsed, setCollapsed] = React.useState<boolean>(() => {
     try { return JSON.parse(localStorage.getItem('contentCollapsed') || 'false'); } catch { return false; }
   });
@@ -2601,10 +2719,22 @@ function ContentTableCard({ filters, dateRange }: { filters: { company?: string;
 
   const rows = React.useMemo(() => {
     return allRows.filter(r => {
-      if (filters.company && r.campaign !== filters.company) return false;
-      if (filters.blogger && r.blogger !== filters.blogger) return false;
-      if (filters.asin && r.asin !== filters.asin) return false;
-      if (filters.link && r.link !== filters.link) return false;
+      // Apply individual filter first if it exists
+      if (individualFilter) {
+        if (individualFilter.type === 'blogger') {
+          if (r.blogger !== individualFilter.value) return false;
+        } else if (individualFilter.type === 'product') {
+          if (r.asin !== individualFilter.value) return false;
+        }
+      } else {
+        // Apply regular filters only if no individual filter
+        if (filters.company && r.campaign !== filters.company) return false;
+        if (filters.blogger && r.blogger !== filters.blogger) return false;
+        if (filters.asin && r.asin !== filters.asin) return false;
+        if (filters.link && r.link !== filters.link) return false;
+      }
+      
+      // Date filter always applies
       if (dateRange) {
         const d = dayjs(r.date).startOf('day');
         const [s, e] = dateRange;
@@ -2612,7 +2742,7 @@ function ContentTableCard({ filters, dateRange }: { filters: { company?: string;
       }
       return true;
     });
-  }, [allRows, filters, dateRange]);
+  }, [allRows, filters, dateRange, individualFilter]);
 
   const handleColumnVisibilityChange = (colId: string, visible: boolean) => {
     setColumnVisibility(prev => ({ ...prev, [colId]: visible }));
@@ -2830,7 +2960,29 @@ function ContentTableCard({ filters, dateRange }: { filters: { company?: string;
 
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <h4 style={{ margin: 0 }}>Content Table:</h4>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h4 style={{ margin: 0 }}>Content Table:</h4>
+                {individualFilter && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Badge 
+                      status="processing" 
+                      text={
+                        <span style={{ fontSize: '12px', color: '#1890ff' }}>
+                          Filtered by {individualFilter.type}: {individualFilter.value}
+                        </span>
+                      } 
+                    />
+                    <Button 
+                      type="text" 
+                      size="small" 
+                      onClick={onClearIndividualFilter}
+                      style={{ fontSize: '12px', padding: '0 4px', height: '20px' }}
+                    >
+                      ✕
+                    </Button>
+                  </div>
+                )}
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ fontSize: '14px', color: '#666' }}>Rows:</span>
