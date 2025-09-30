@@ -196,6 +196,7 @@ const bloggerOptions = [
 let asinOptions: { value: string; label: string }[] = [];
 // linkOptions will be generated dynamically from contentRowsBase
 
+// Default metrics (will be calculated after data is defined)
 const prevM = { Spend:1774.18, Clicks:3249, Orders:120, Sales:8065.07, Conversion:'12%', 'Commision Rate':'5%', Profit:3200, 'Promotional Costs': 650.00, 'Total expenses': 2424.18 } as const;
 const curM  = { Spend:3372.42, Clicks:6200, Orders:100, Sales:15450.24, Conversion:'15%', 'Commision Rate':'7%', Profit:5400, 'Promotional Costs': 980.00, 'Total expenses': 4352.42 } as const;
 const allMetrics = Object.keys(prevM) as Array<keyof typeof prevM>;
@@ -1484,13 +1485,16 @@ const extractProductData = (product: string) => {
 };
 
 const detailsRowsBase: Row[] = [
-  { key:'1', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQtJr-cqOx04hXoXD06NMfsGlB-UFxHD3rAaA&s', product:'B0AAA11111 (SKU: HVM-70001) Stainless Steel Toilet Brush and Holder – Matte Black', asin: 'B0AAA11111', blogger:'Иван Иванов', orders:0, clicks:0, conversion:0, rate:7, margin:15, spend:0, sales:0, profit:0, promoCosts: 0, totalExpenses: 0 },
-  { key:'2', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTpbMMyNkEN6q0bscf53nWBb3F3pXAJr11NfQ&s', product:'B0BBB22222 (SKU: HVM-70002) 720° Rotating Faucet Aerator – Splash-proof Smart Filter', asin: 'B0BBB22222', blogger:'Мария Смирнова', orders:1, clicks:15, conversion:6.7, rate:7, margin:53, spend:0, sales:12.64, profit:6.72, promoCosts: 2.50, totalExpenses: 2.50 },
-  { key:'3', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQKprCjvW5CbqPRI9Qt8DIHJVztC4FlWkoSfg&s', product:'B0CCC33333 (SKU: HVM-70003) Gold Toilet Brush and Holder – Brushed Stainless Steel', asin: 'B0CCC33333', blogger:'Иван Иванов', orders:2, clicks:30, conversion:6.7, rate:7, margin:53, spend:0, sales:25.28, profit:13.44, promoCosts: 5.00, totalExpenses: 5.00 },
-  { key:'4', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSJLGQ3xRxuRsEnru3EiWdylLg7GVaEESV8Yg&s', product:'B0DDD44444 (SKU: HVM-70004) Gold Toilet Brush and Holder – Deluxe Edition', asin: 'B0DDD44444', blogger:'Мария Смирнова', orders:1, clicks:15, conversion:6.7, rate:7, margin:53, spend:0, sales:12.64, profit:6.72, promoCosts: 2.50, totalExpenses: 2.50 },
+  { key:'1', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQtJr-cqOx04hXoXD06NMfsGlB-UFxHD3rAaA&s', product:'B08RXT2YVL (SKU: HVM-70001) Stainless Steel Toilet Brush and Holder – Matte Black', asin: 'B08RXT2YVL', blogger:'Иван Иванов', orders:5, clicks:120, conversion:4.2, rate:7, margin:15, spend:45.50, sales:89.20, profit:13.38, promoCosts: 12.50, totalExpenses: 58.00 },
+  { key:'2', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTpbMMyNkEN6q0bscf53nWBb3F3pXAJr11NfQ&s', product:'B0BBB22222 (SKU: HVM-70002) 720° Rotating Faucet Aerator – Splash-proof Smart Filter', asin: 'B0BBB22222', blogger:'Мария Смирнова', orders:8, clicks:95, conversion:8.4, rate:7, margin:53, spend:32.80, sales:126.40, profit:67.00, promoCosts: 18.20, totalExpenses: 51.00 },
+  { key:'3', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQKprCjvW5CbqPRI9Qt8DIHJVztC4FlWkoSfg&s', product:'B0CCC33333 (SKU: HVM-70003) Gold Toilet Brush and Holder – Brushed Stainless Steel', asin: 'B0CCC33333', blogger:'Иван Иванов', orders:12, clicks:180, conversion:6.7, rate:7, margin:53, spend:67.50, sales:252.80, profit:134.00, promoCosts: 25.00, totalExpenses: 92.50 },
+  { key:'4', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSJLGQ3xRxuRsEnru3EiWdylLg7GVaEESV8Yg&s', product:'B0DDD44444 (SKU: HVM-70004) Gold Toilet Brush and Holder – Deluxe Edition', asin: 'B0DDD44444', blogger:'Мария Смирнова', orders:6, clicks:75, conversion:8.0, rate:7, margin:53, spend:28.40, sales:126.40, profit:67.00, promoCosts: 15.00, totalExpenses: 43.40 },
   // Добавляем строки для Shopify (который есть в фильтрах, но отсутствует в таблицах)
-  { key:'5', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQtJr-cqOx04hXoXD06NMfsGlB-UFxHD3rAaA&s', product:'B0EEE55555 (SKU: HVM-70005) Premium Kitchen Faucet Filter – Advanced Filtration', asin: 'B0EEE55555', blogger:'Иван Иванов', orders:3, clicks:45, conversion:6.7, rate:7, margin:53, spend:0, sales:37.92, profit:20.16, promoCosts: 7.50, totalExpenses: 7.50 },
-  { key:'6', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTpbMMyNkEN6q0bscf53nWBb3F3pXAJr11NfQ&s', product:'B0FFF66666 (SKU: HVM-70006) Smart Water Filter System – Multi-Stage Purification', asin: 'B0FFF66666', blogger:'Мария Смирнова', orders:2, clicks:30, conversion:6.7, rate:7, margin:53, spend:0, sales:25.28, profit:13.44, promoCosts: 5.00, totalExpenses: 5.00 },
+  { key:'5', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQtJr-cqOx04hXoXD06NMfsGlB-UFxHD3rAaA&s', product:'B0EEE55555 (SKU: HVM-70005) Premium Kitchen Faucet Filter – Advanced Filtration', asin: 'B0EEE55555', blogger:'Иван Иванов', orders:15, clicks:220, conversion:6.8, rate:7, margin:53, spend:89.20, sales:379.20, profit:201.00, promoCosts: 35.00, totalExpenses: 124.20 },
+  { key:'6', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTpbMMyNkEN6q0bscf53nWBb3F3pXAJr11NfQ&s', product:'B0FFF66666 (SKU: HVM-70006) Smart Water Filter System – Multi-Stage Purification', asin: 'B0FFF66666', blogger:'Мария Смирнова', orders:9, clicks:140, conversion:6.4, rate:7, margin:53, spend:52.80, sales:252.80, profit:134.00, promoCosts: 22.50, totalExpenses: 75.30 },
+  // Добавляем больше данных для лучшего тестирования
+  { key:'7', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQtJr-cqOx04hXoXD06NMfsGlB-UFxHD3rAaA&s', product:'B0GGG77777 (SKU: HVM-70007) Advanced Water Purifier – 5-Stage Filtration', asin: 'B0GGG77777', blogger:'Иван Иванов', orders:20, clicks:300, conversion:6.7, rate:7, margin:53, spend:125.00, sales:505.60, profit:268.00, promoCosts: 50.00, totalExpenses: 175.00 },
+  { key:'8', img:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTpbMMyNkEN6q0bscf53nWBb3F3pXAJr11NfQ&s', product:'B0HHH88888 (SKU: HVM-70008) Compact Faucet Filter – Easy Installation', asin: 'B0HHH88888', blogger:'Мария Смирнова', orders:7, clicks:110, conversion:6.4, rate:7, margin:53, spend:41.20, sales:189.60, profit:100.50, promoCosts: 17.50, totalExpenses: 58.70 },
 ];
 
 // Initialize asinOptions now that detailsRowsBase is known
@@ -1516,12 +1520,19 @@ const getAsinOptions = () => {
 
 // Content table data for link options
 const contentRowsBase: ContentRow[] = [
-  { key: 'c1', asin: 'B0AAA11111', blogger: 'Иван Иванов', date: dayjs().subtract(1, 'day').format('YYYY-MM-DD'), campaign: 'Amazon', link: 'https://youtube.com/watch?v=abc123' },
+  { key: 'c1', asin: 'B08RXT2YVL', blogger: 'Иван Иванов', date: dayjs().subtract(1, 'day').format('YYYY-MM-DD'), campaign: 'Amazon', link: 'https://youtube.com/watch?v=abc123' },
   { key: 'c2', asin: 'B0BBB22222', blogger: 'Мария Смирнова', date: dayjs().format('YYYY-MM-DD'), campaign: 'eBay', link: 'https://instagram.com/p/xyz789' },
   { key: 'c3', asin: 'B0CCC33333', blogger: 'Иван Иванов', date: dayjs().subtract(2, 'day').format('YYYY-MM-DD'), campaign: 'Amazon', link: 'https://youtube.com/watch?v=def456' },
   { key: 'c4', asin: 'B0DDD44444', blogger: 'Мария Смирнова', date: dayjs().subtract(3, 'day').format('YYYY-MM-DD'), campaign: 'eBay', link: 'https://instagram.com/p/ghi789' },
   { key: 'c5', asin: 'B0EEE55555', blogger: 'Иван Иванов', date: dayjs().subtract(4, 'day').format('YYYY-MM-DD'), campaign: 'Shopify', link: 'https://youtube.com/watch?v=jkl012' },
   { key: 'c6', asin: 'B0FFF66666', blogger: 'Мария Смирнова', date: dayjs().subtract(5, 'day').format('YYYY-MM-DD'), campaign: 'Shopify', link: 'https://instagram.com/p/mno345' },
+  // Добавляем больше данных для лучшего тестирования
+  { key: 'c7', asin: 'B0GGG77777', blogger: 'Иван Иванов', date: dayjs().subtract(6, 'day').format('YYYY-MM-DD'), campaign: 'Amazon', link: 'https://youtube.com/watch?v=pqr678' },
+  { key: 'c8', asin: 'B0HHH88888', blogger: 'Мария Смирнова', date: dayjs().subtract(7, 'day').format('YYYY-MM-DD'), campaign: 'eBay', link: 'https://instagram.com/p/stu901' },
+  { key: 'c9', asin: 'B08RXT2YVL', blogger: 'Иван Иванов', date: dayjs().subtract(8, 'day').format('YYYY-MM-DD'), campaign: 'Amazon', link: 'https://youtube.com/watch?v=vwx234' },
+  { key: 'c10', asin: 'B0BBB22222', blogger: 'Мария Смирнова', date: dayjs().subtract(9, 'day').format('YYYY-MM-DD'), campaign: 'eBay', link: 'https://instagram.com/p/yza567' },
+  { key: 'c11', asin: 'B0CCC33333', blogger: 'Иван Иванов', date: dayjs().subtract(10, 'day').format('YYYY-MM-DD'), campaign: 'Shopify', link: 'https://youtube.com/watch?v=bcd890' },
+  { key: 'c12', asin: 'B0DDD44444', blogger: 'Мария Смирнова', date: dayjs().subtract(11, 'day').format('YYYY-MM-DD'), campaign: 'Shopify', link: 'https://instagram.com/p/efg123' },
 ];
 
 const getLinkOptions = () => {
@@ -1530,6 +1541,99 @@ const getLinkOptions = () => {
   contentRowsBase.forEach(r => links.add(r.link));
   return Array.from(links).map(l => ({ value: l, label: l }));
 };
+
+// Function to calculate metrics based on filters
+function calculateMetrics(
+  filters: { 
+    company?: string; 
+    blogger?: string; 
+    asin?: string; 
+    link?: string 
+  }, 
+  dateRange: [Dayjs, Dayjs] | null
+) {
+  // Filter detailsRowsBase based on current filters
+  let filteredDetails = detailsRowsBase.filter(row => {
+    // Apply company filter (campaign filter)
+    if (filters.company) {
+      // Find matching content rows for this ASIN to get campaign info
+      const contentRow = contentRowsBase.find(cr => cr.asin === row.asin);
+      if (!contentRow || contentRow.campaign !== filters.company) {
+        return false;
+      }
+    }
+    
+    // Apply blogger filter
+    if (filters.blogger && row.blogger !== filters.blogger) {
+      return false;
+    }
+    
+    // Apply ASIN filter
+    if (filters.asin && row.asin !== filters.asin) {
+      return false;
+    }
+    
+    // Apply link filter (if specified)
+    if (filters.link) {
+      const contentRow = contentRowsBase.find(cr => cr.asin === row.asin);
+      if (!contentRow || contentRow.link !== filters.link) {
+        return false;
+      }
+    }
+    
+    return true;
+  });
+  
+  // Filter contentRowsBase for date range
+  let filteredContent = contentRowsBase.filter(row => {
+    if (!dateRange) return true;
+    
+    const rowDate = dayjs(row.date).startOf('day');
+    const [start, end] = dateRange;
+    return rowDate.isAfter(start.startOf('day').subtract(1, 'day')) && 
+           rowDate.isBefore(end.endOf('day').add(1, 'day'));
+  });
+  
+  // Apply content filters to details
+  if (dateRange || filters.company || filters.link) {
+    const validAsins = new Set(filteredContent.map(cr => cr.asin));
+    filteredDetails = filteredDetails.filter(dr => validAsins.has(dr.asin));
+  }
+  
+  // Calculate current metrics
+  const currentMetrics = {
+    Spend: filteredDetails.reduce((sum, row) => sum + row.spend, 0),
+    Clicks: filteredDetails.reduce((sum, row) => sum + row.clicks, 0),
+    Orders: filteredDetails.reduce((sum, row) => sum + row.orders, 0),
+    Sales: filteredDetails.reduce((sum, row) => sum + row.sales, 0),
+    Conversion: filteredDetails.length > 0 ? 
+      (filteredDetails.reduce((sum, row) => sum + row.orders, 0) / 
+       Math.max(filteredDetails.reduce((sum, row) => sum + row.clicks, 0), 1) * 100).toFixed(1) + '%' : '0%',
+    'Commision Rate': filteredDetails.length > 0 ? 
+      (filteredDetails.reduce((sum, row) => sum + row.rate, 0) / filteredDetails.length).toFixed(1) + '%' : '0%',
+    Profit: filteredDetails.reduce((sum, row) => sum + row.profit, 0),
+    'Promotional Costs': filteredDetails.reduce((sum, row) => sum + row.promoCosts, 0),
+    'Total expenses': filteredDetails.reduce((sum, row) => sum + row.totalExpenses, 0)
+  };
+  
+  // Calculate previous period metrics (for comparison)
+  // For demo purposes, we'll use a simple calculation based on current data
+  const previousMetrics = {
+    Spend: currentMetrics.Spend * 0.6, // Simulate 40% increase
+    Clicks: Math.round(currentMetrics.Clicks * 0.7), // Simulate 30% increase
+    Orders: Math.round(currentMetrics.Orders * 0.8), // Simulate 20% increase
+    Sales: currentMetrics.Sales * 0.6, // Simulate 40% increase
+    Conversion: currentMetrics.Conversion === '0%' ? '0%' : 
+      (parseFloat(currentMetrics.Conversion.replace('%', '')) * 0.8).toFixed(1) + '%',
+    'Commision Rate': currentMetrics['Commision Rate'] === '0%' ? '0%' : 
+      (parseFloat(currentMetrics['Commision Rate'].replace('%', '')) * 0.7).toFixed(1) + '%',
+    Profit: currentMetrics.Profit * 0.6, // Simulate 40% increase
+    'Promotional Costs': currentMetrics['Promotional Costs'] * 0.6,
+    'Total expenses': currentMetrics['Total expenses'] * 0.6
+  };
+  
+  return { current: currentMetrics, previous: previousMetrics };
+}
 
 function TruncatedText({ text, style }: { text: string; style: React.CSSProperties }) {
   const [isOverflowing, setIsOverflowing] = React.useState(false);
@@ -1905,14 +2009,6 @@ function DetailsTable({ filters, onShowContent }: {
   });
   const gridRef = React.useRef<AgGridReact>(null);
   
-  // Context menu state
-  const [contextMenu, setContextMenu] = React.useState<{
-    visible: boolean;
-    x: number;
-    y: number;
-    type: 'blogger' | 'product';
-    value: string;
-  } | null>(null);
 
   React.useEffect(() => {
     try { localStorage.setItem('detailsColumnVisibility', JSON.stringify(columnVisibility)); } catch {}
@@ -2048,21 +2144,21 @@ function DetailsTable({ filters, onShowContent }: {
       cellRenderer: (params: any) => {
         const r = params.data as Row;
         
-        const handleContextMenu = (e: React.MouseEvent) => {
-          e.preventDefault();
+        const handleShowContent = () => {
           const value = viewMode === 'blogger' ? (r.blogger || '') : r.product;
-          setContextMenu({
-            visible: true,
-            x: e.clientX,
-            y: e.clientY,
+          const filterValue = viewMode === 'blogger' 
+            ? value 
+            : extractProductData(value).asin;
+          
+          onShowContent({
             type: viewMode === 'blogger' ? 'blogger' : 'product',
-            value: value
+            value: filterValue
           });
         };
         
         if (viewMode === 'blogger') {
           return (
-            <div onContextMenu={handleContextMenu} style={{ width: '100%', height: '100%', cursor: 'context-menu' }}>
+            <div style={{ width: '100%', height: '100%', position: 'relative', minHeight: '56px' }}>
               <TruncatedTextWithTooltip 
                 text={r.blogger || ''}
                 style={{
@@ -2070,13 +2166,40 @@ function DetailsTable({ filters, onShowContent }: {
                   color: '#262626'
                 }}
               />
+              <div
+                onClick={handleShowContent}
+                style={{
+                  position: 'absolute',
+                  bottom: '4px',
+                  right: '4px',
+                  width: '16px',
+                  height: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#1890ff',
+                  fontSize: '12px',
+                  opacity: 0.7,
+                  transition: 'opacity 0.2s ease',
+                  flexShrink: 0
+                }}
+                onMouseEnter={(e) => {
+                  (e.target as HTMLElement).style.opacity = '1';
+                }}
+                onMouseLeave={(e) => {
+                  (e.target as HTMLElement).style.opacity = '0.7';
+                }}
+                title="Show content"
+              >
+                🔍
+              </div>
             </div>
           );
         } else {
           const { asin, sku, name } = extractProductData(r.product);
           return (
             <div 
-              onContextMenu={handleContextMenu}
               style={{ 
                 display: 'flex',
                 flexDirection: 'column',
@@ -2084,7 +2207,8 @@ function DetailsTable({ filters, onShowContent }: {
                 height: '100%',
                 minHeight: '56px',
                 minWidth: 0,
-                cursor: 'context-menu'
+                position: 'relative',
+                width: '100%'
               }}>
               {/* Верхняя строка - название продукта */}
               <div style={{ marginBottom: '4px', minWidth: 0 }}>
@@ -2132,10 +2256,14 @@ function DetailsTable({ filters, onShowContent }: {
                   {/* Средняя строка - ASIN */}
                   <div style={{ 
                     fontSize: 13, 
-                    color: '#595959',
+                    color: '#1890ff',
                     fontWeight: 500,
-                    lineHeight: '16px'
-                  }}>
+                    lineHeight: '16px',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => window.open(`https://www.amazon.com/dp/${asin}`, '_blank')}
+                  title={`Open ${asin} on Amazon`}
+                  >
                     {asin}
                   </div>
                   
@@ -2148,6 +2276,36 @@ function DetailsTable({ filters, onShowContent }: {
                     SKU: {sku}
                   </div>
                 </div>
+              </div>
+              
+              {/* Иконка лупы в правом нижнем углу */}
+              <div
+                onClick={handleShowContent}
+                style={{
+                  position: 'absolute',
+                  bottom: '4px',
+                  right: '4px',
+                  width: '16px',
+                  height: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#1890ff',
+                  fontSize: '12px',
+                  opacity: 0.7,
+                  transition: 'opacity 0.2s ease',
+                  flexShrink: 0
+                }}
+                onMouseEnter={(e) => {
+                  (e.target as HTMLElement).style.opacity = '1';
+                }}
+                onMouseLeave={(e) => {
+                  (e.target as HTMLElement).style.opacity = '0.7';
+                }}
+                title="Show content"
+              >
+                🔍
               </div>
             </div>
           );
@@ -2259,65 +2417,6 @@ function DetailsTable({ filters, onShowContent }: {
           />
         </div>
       </div>
-      
-      {/* Context Menu */}
-      {contextMenu && (
-        <>
-          <div 
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              zIndex: 999
-            }}
-            onClick={() => setContextMenu(null)}
-          />
-          <div
-            style={{
-              position: 'fixed',
-              top: contextMenu.y,
-              left: contextMenu.x,
-              background: '#fff',
-              border: '1px solid #d9d9d9',
-              borderRadius: '6px',
-              boxShadow: '0 6px 16px 0 rgba(0, 0, 0, 0.08)',
-              zIndex: 1000,
-              minWidth: '140px'
-            }}
-          >
-            <div
-              style={{
-                padding: '8px 12px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                color: '#000000d9',
-                borderRadius: '6px'
-              }}
-              onMouseEnter={(e) => {
-                (e.target as HTMLElement).style.backgroundColor = '#f5f5f5';
-              }}
-              onMouseLeave={(e) => {
-                (e.target as HTMLElement).style.backgroundColor = 'transparent';
-              }}
-              onClick={() => {
-                const filterValue = contextMenu.type === 'blogger' 
-                  ? contextMenu.value 
-                  : extractProductData(contextMenu.value).asin;
-                
-                onShowContent({
-                  type: contextMenu.type,
-                  value: filterValue
-                });
-                setContextMenu(null);
-              }}
-            >
-              Show info
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 }
@@ -2366,6 +2465,9 @@ export default function App() {
   
   // Individual filter state for Content table
   const [individualFilter, setIndividualFilter] = React.useState<{ type: 'blogger' | 'product'; value: string } | null>(null);
+  
+  // Ref for Content table to enable scrolling
+  const contentTableRef = React.useRef<HTMLDivElement>(null);
 
   // Calculate radio button availability based on selected period
   const getAxisTypeAvailability = React.useCallback(() => {
@@ -2608,24 +2710,6 @@ export default function App() {
                 <Button>Tiles Presets <DownOutlined /></Button>
               </Dropdown>
 
-              <Button 
-                type="primary"
-                onClick={() => setShowDetails(v => !v)}
-                style={{
-                  backgroundColor: showDetails ? '#1890ff' : '#1890ff',
-                  borderColor: showDetails ? '#1890ff' : '#1890ff',
-                  color: '#ffffff',
-                  boxShadow: showDetails 
-                    ? 'inset 0 4px 8px rgba(0,0,0,0.3), inset 0 1px 2px rgba(0,0,0,0.2), 0 1px 1px rgba(0,0,0,0.1)' 
-                    : '0 4px 8px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.1)',
-                  transform: showDetails ? 'translateY(2px)' : 'translateY(0)',
-                  transition: 'all 0.2s ease',
-                  border: showDetails ? '1px solid #1890ff' : '1px solid #1890ff',
-                  borderRadius: '20px'
-                }}
-              >
-                Details
-              </Button>
             </div>
 
             <div style={{
@@ -2636,29 +2720,62 @@ export default function App() {
               margin: '0 auto 24px',
               overflowX: 'auto'
             }}>
-              {tileOrder.filter(k => visibleKeys.includes(k)).map(m => (
-                <div key={m} draggable onDragStart={handleDragStart(m)} onDragOver={handleDragOver(m)} onDragEnd={handleDragEnd}>
-                  <MetricCard title={m} value={(curM as any)[m]} prev={(prevM as any)[m]} />
-                </div>
-              ))}
+              {tileOrder.filter(k => visibleKeys.includes(k)).map(m => {
+                const currentMetrics = calculateMetrics(
+                  { 
+                    company: selectedCompany, 
+                    blogger: selectedBlogger, 
+                    asin: selectedAsin, 
+                    link: selectedLink 
+                  }, 
+                  dateRange
+                );
+                return (
+                  <div key={m} draggable onDragStart={handleDragStart(m)} onDragOver={handleDragOver(m)} onDragEnd={handleDragEnd}>
+                    <MetricCard 
+                      title={m} 
+                      value={(currentMetrics.current as any)[m]} 
+                      prev={(currentMetrics.previous as any)[m]} 
+                    />
+                  </div>
+                );
+              })}
             </div>
 
             <div style={{ position: 'relative' }}>
               <ChartsBlock dateRange={dateRange} axisType={axisType} />
+              <DetailsToggle showDetails={showDetails} setShowDetails={setShowDetails} />
               <SummaryToggle dateRange={dateRange} />
-              <SummaryPanel dateRange={dateRange} />
+              <SummaryPanel 
+                dateRange={dateRange} 
+                filters={{ 
+                  company: selectedCompany, 
+                  blogger: selectedBlogger, 
+                  asin: selectedAsin, 
+                  link: selectedLink 
+                }} 
+              />
             </div>
 
             {showDetails && (
               <div style={{ marginTop: 16 }}>
                 <DetailsTable 
                   filters={{ asin: selectedAsin, blogger: selectedBlogger }} 
-                  onShowContent={setIndividualFilter}
+                  onShowContent={(filter) => {
+                    setIndividualFilter(filter);
+                    // Scroll to Content table
+                    setTimeout(() => {
+                      contentTableRef.current?.scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'start' 
+                      });
+                    }, 100);
+                  }}
                 />
               </div>
             )}
 
-            <div style={{ marginTop: 16 }}>
+            <div ref={contentTableRef} style={{ marginTop: 16 }}>
               <ContentTableCard
                 filters={{ company: selectedCompany, blogger: selectedBlogger, asin: selectedAsin, link: selectedLink }}
                 dateRange={dateRange}
@@ -2867,13 +2984,23 @@ function ContentTableCard({
       filter: true, 
       hide: columnVisibility['asin'] === false,
       cellRenderer: (params: any) => (
-        <TruncatedTextWithTooltip 
-          text={params.value || ''}
+        <div
+          onClick={() => window.open(`https://www.amazon.com/dp/${params.value}`, '_blank')}
           style={{
             fontSize: '14px',
-            color: '#262626'
+            color: '#1890ff',
+            cursor: 'pointer'
           }}
-        />
+          title={`Open ${params.value} on Amazon`}
+        >
+          <TruncatedTextWithTooltip 
+            text={params.value || ''}
+            style={{
+              fontSize: '14px',
+              color: '#1890ff'
+            }}
+          />
+        </div>
       )
     },
     { 
@@ -3053,6 +3180,38 @@ function ContentTableCard({
     </Card>
   );
 }
+function DetailsToggle({ showDetails, setShowDetails }: { showDetails: boolean; setShowDetails: (value: boolean) => void }) {
+  return (
+    <Button
+      type="text"
+      onClick={() => setShowDetails(!showDetails)}
+      style={{ 
+        position: 'fixed', 
+        top: 76, 
+        right: 4, 
+        zIndex: 50, 
+        border: '1px solid #D9D9D9', 
+        borderRadius: 16, 
+        background: showDetails ? '#1890ff' : '#ffffff', 
+        color: showDetails ? '#ffffff' : '#000000',
+        boxShadow: showDetails 
+          ? 'inset 0 4px 8px rgba(0,0,0,0.3), inset 0 1px 2px rgba(0,0,0,0.2), 0 1px 1px rgba(0,0,0,0.1)' 
+          : '0 1px 2px rgba(0,0,0,0.06)',
+        transform: showDetails ? 'translateY(2px)' : 'translateY(0)',
+        transition: 'all 0.2s ease',
+        width: 40,
+        height: 40,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}
+      aria-label="Toggle details"
+    >
+      <InfoCircleOutlined />
+    </Button>
+  );
+}
+
 function SummaryToggle({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
   const [open, setOpen] = React.useState<boolean>(() => {
     try { return JSON.parse(localStorage.getItem('summaryOpen') || 'false'); } catch { return false; }
@@ -3073,7 +3232,7 @@ function SummaryToggle({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
     <Button
       type="text"
       onClick={toggle}
-      style={{ position: 'fixed', top: 128, right: open ? 364 : 4, zIndex: 50, border: '1px solid #D9D9D9', borderRadius: 16, background: '#ffffff', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}
+      style={{ position: 'fixed', top: 128, right: open ? 364 : 4, zIndex: 50, border: '1px solid #D9D9D9', borderRadius: 16, background: '#ffffff', boxShadow: '0 1px 2px rgba(0,0,0,0.06)', width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       aria-label="Toggle summary"
     >
       {open ? <RightCircleOutlined /> : <LeftCircleOutlined />}
@@ -3081,7 +3240,18 @@ function SummaryToggle({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
   );
 }
 
-function SummaryPanel({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
+function SummaryPanel({ 
+  dateRange, 
+  filters 
+}: { 
+  dateRange: [Dayjs, Dayjs] | null;
+  filters: { 
+    company?: string; 
+    blogger?: string; 
+    asin?: string; 
+    link?: string 
+  };
+}) {
   const [open, setOpen] = React.useState<boolean>(() => {
     try { return JSON.parse(localStorage.getItem('summaryOpen') || 'false'); } catch { return false; }
   });
@@ -3102,20 +3272,21 @@ function SummaryPanel({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
   const fmtCurrency = (v: number) => `$${v.toLocaleString('ru-RU', { minimumFractionDigits: 2 })}`;
   const fmtPercent = (v: number) => `${v.toFixed(1)}%`;
 
-  // Mock calculations based on existing demo totals
-  const sales = curM.Sales;
-  const units = curM.Orders; // using Orders as Units for demo
-  const clicks = curM.Clicks;
-  const conversion = parseFloat(String(curM.Conversion).replace('%', ''));
-  const promoCost = (curM as any)['Promotional Costs'] ?? Math.round(curM.Spend * 0.25 * 100) / 100;
+  // Calculate metrics based on current filters
+  const currentMetrics = calculateMetrics(filters, dateRange);
+  const sales = currentMetrics.current.Sales;
+  const units = currentMetrics.current.Orders; // using Orders as Units for demo
+  const clicks = currentMetrics.current.Clicks;
+  const conversion = parseFloat(String(currentMetrics.current.Conversion).replace('%', ''));
+  const promoCost = (currentMetrics.current as any)['Promotional Costs'] ?? Math.round(currentMetrics.current.Spend * 0.25 * 100) / 100;
   const promoPerc = sales ? (promoCost / sales) * 100 : 0;
-  const commissionPerc = parseFloat(String((curM as any)['Commision Rate']).replace('%', '')) || 7;
+  const commissionPerc = parseFloat(String((currentMetrics.current as any)['Commision Rate']).replace('%', '')) || 7;
   const commissionUsd = sales * (commissionPerc / 100);
   const costPerc = 30; // demo
   const costUsd = sales * (costPerc / 100);
   const holdsPerc = 5; // demo
   const holdsUsd = sales * (holdsPerc / 100);
-  const profit = curM.Profit;
+  const profit = currentMetrics.current.Profit;
 
   return (
     <div style={{ position: 'fixed', top: 0, right: 0, width: open ? 360 : 0, overflow: 'hidden', transition: 'width 0.2s ease', zIndex: 20, height: '100vh', paddingTop: '120px' }}>
