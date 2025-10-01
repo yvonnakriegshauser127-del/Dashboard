@@ -1269,78 +1269,78 @@ function ChartsBlock({ dateRange, axisType }: { dateRange: [Dayjs, Dayjs] | null
       style={{ maxWidth: 1600, margin: '0 auto' }}
       styles={{ body: collapsed ? { display: 'none', padding: 0 } : undefined }}
       extra={
-        <Button type="text" onClick={() => setCollapsed(v => !v)}>
-          {collapsed ? <DownOutlined /> : <UpOutlined />}
-        </Button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {!collapsed && (
+            <Dropdown
+              open={presetsOpen}
+              onOpenChange={setPresetsOpen}
+              popupRender={() => (
+                <div style={{ 
+                  background: '#fff', 
+                  border: '1px solid #d9d9d9', 
+                  borderRadius: '6px', 
+                  boxShadow: '0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 9px 28px 8px rgba(0, 0, 0, 0.05)',
+                  padding: '8px',
+                  minWidth: '280px'
+                }}>
+                  
+                  <div style={{ maxHeight: '220px', overflowY: 'auto', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 4px' }}>
+                      <Button type="link" style={{ padding: 0 }} onClick={resetToDefault}>
+                        Reset to Default
+                      </Button>
+                    </div>
+                    
+                    {presets.length === 0 && (
+                      <Typography.Text type="secondary" style={{ display: 'block', padding: '6px 4px' }}>
+                        No presets saved
+                      </Typography.Text>
+                    )}
+                    
+                    {presets.map((preset, idx) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 4px' }}>
+                        <Button 
+                          type="link" 
+                          style={{ padding: 0 }} 
+                          onClick={() => applyPreset(preset)}
+                        >
+                          {preset.name}
+                        </Button>
+                        <Button 
+                          size="small" 
+                          danger 
+                          onClick={() => deletePreset(preset.name)}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <Divider style={{ margin: '8px 0' }} />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <Input 
+                      placeholder="New preset name" 
+                      value={newPresetName} 
+                      onChange={e => setNewPresetName(e.target.value)}
+                      onPressEnter={savePreset}
+                    />
+                    <Button onClick={savePreset}>+</Button>
+                  </div>
+                </div>
+              )}
+            >
+              <Button>Chart Presets <DownOutlined /></Button>
+            </Dropdown>
+          )}
+          <Button type="text" onClick={() => setCollapsed(v => !v)}>
+            {collapsed ? <DownOutlined /> : <UpOutlined />}
+          </Button>
+        </div>
       }
     >
       {!collapsed && (
         <>
-          {/* Presets dropdown */}
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-          <Dropdown
-            open={presetsOpen}
-            onOpenChange={setPresetsOpen}
-            popupRender={() => (
-              <div style={{ 
-                background: '#fff', 
-                border: '1px solid #d9d9d9', 
-                borderRadius: '6px', 
-                boxShadow: '0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 9px 28px 8px rgba(0, 0, 0, 0.05)',
-                padding: '8px',
-                minWidth: '280px'
-              }}>
-                
-                <div style={{ maxHeight: '220px', overflowY: 'auto', marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 4px' }}>
-                    <Button type="link" style={{ padding: 0 }} onClick={resetToDefault}>
-                      Reset to Default
-                    </Button>
-                  </div>
-                  
-                  {presets.length === 0 && (
-                    <Typography.Text type="secondary" style={{ display: 'block', padding: '6px 4px' }}>
-                      No presets saved
-                    </Typography.Text>
-                  )}
-                  
-                  {presets.map((preset, idx) => (
-                    <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 4px' }}>
-                      <Button 
-                        type="link" 
-                        style={{ padding: 0 }} 
-                        onClick={() => applyPreset(preset)}
-                      >
-                        {preset.name}
-                      </Button>
-                      <Button 
-                        size="small" 
-                        danger 
-                        onClick={() => deletePreset(preset.name)}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-                
-                <Divider style={{ margin: '8px 0' }} />
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <Input 
-                    placeholder="New preset name" 
-                    value={newPresetName} 
-                    onChange={e => setNewPresetName(e.target.value)}
-                    onPressEnter={savePreset}
-                  />
-                  <Button onClick={savePreset}>+</Button>
-                </div>
-              </div>
-            )}
-          >
-            <Button>Chart Presets <DownOutlined /></Button>
-          </Dropdown>
-        </div>
-
         {/* Row with main and up to two others (max 3 total), equal widths */}
       <div style={{ display: 'flex', gap: 16, alignItems: 'stretch', marginBottom: 16 }}>
         {rowChartIds.map((id) => {
