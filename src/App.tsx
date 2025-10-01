@@ -992,7 +992,7 @@ function UnifiedChart({
             open={dropOpen} 
             onOpenChange={setDropOpen} 
             trigger={['click']}
-            dropdownRender={() => (
+            popupRender={() => (
               <div style={{ 
                 background: '#fff', 
                 border: '1px solid #d9d9d9', 
@@ -1281,7 +1281,7 @@ function ChartsBlock({ dateRange, axisType }: { dateRange: [Dayjs, Dayjs] | null
           <Dropdown
             open={presetsOpen}
             onOpenChange={setPresetsOpen}
-            dropdownRender={() => (
+            popupRender={() => (
               <div style={{ 
                 background: '#fff', 
                 border: '1px solid #d9d9d9', 
@@ -2425,6 +2425,16 @@ export default function App() {
   const [visibleKeys, setVisibleKeys] = React.useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem('visibleKeys') || JSON.stringify(allMetrics)); } catch { return allMetrics as string[]; }
   });
+  const [activeSection, setActiveSection] = React.useState<string>('filters');
+  const clickActiveLockRef = React.useRef<number | null>(null);
+  
+  // Refs for navigation
+  const filtersRef = React.useRef<HTMLDivElement>(null);
+  const tilesRef = React.useRef<HTMLDivElement>(null);
+  const chartsRef = React.useRef<HTMLDivElement>(null);
+  const detailsRef = React.useRef<HTMLDivElement>(null);
+  const contentRef = React.useRef<HTMLDivElement>(null);
+  
   const [tileOrder, setTileOrder] = React.useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem('tileOrder') || JSON.stringify(allMetrics)); } catch { return allMetrics as string[]; }
   });
@@ -2466,8 +2476,6 @@ export default function App() {
   // Individual filter state for Content table
   const [individualFilter, setIndividualFilter] = React.useState<{ type: 'blogger' | 'product'; value: string } | null>(null);
   
-  // Ref for Content table to enable scrolling
-  const contentTableRef = React.useRef<HTMLDivElement>(null);
 
   // Calculate radio button availability based on selected period
   const getAxisTypeAvailability = React.useCallback(() => {
@@ -2608,9 +2616,172 @@ export default function App() {
   };
   const handleDragEnd = () => { dragKeyRef.current = null; };
 
+  // Navigation functions - simplified with fixed positions
+  const scrollToSection = (section: string) => {
+    // Immediately update active section on click and lock scroll handler briefly
+    setActiveSection(section);
+    if (clickActiveLockRef.current) {
+      window.clearTimeout(clickActiveLockRef.current);
+    }
+    clickActiveLockRef.current = window.setTimeout(() => {
+      clickActiveLockRef.current = null;
+    }, 1200); // lock for duration close to smooth scroll
+
+    const headerOffset = 100;
+    const getTop = (el: HTMLElement) => el.getBoundingClientRect().top + window.scrollY;
+    
+    switch (section) {
+      case 'filters':
+        if (filtersRef.current) {
+          const top = Math.max(getTop(filtersRef.current) - headerOffset, 0);
+          window.scrollTo({ top, behavior: 'smooth' });
+        }
+        break;
+        
+      case 'tiles':
+        if (tilesRef.current) {
+          const top = Math.max(getTop(tilesRef.current) - headerOffset, 0);
+          window.scrollTo({ top, behavior: 'smooth' });
+        }
+        break;
+        
+      case 'charts':
+        if (chartsRef.current) {
+          const top = Math.max(getTop(chartsRef.current) - headerOffset, 0);
+          window.scrollTo({ top, behavior: 'smooth' });
+        }
+        break;
+        
+      case 'details':
+        // Always scroll to the position where Details table would be
+        // This is between charts and content, regardless of showDetails state
+        if (chartsRef.current) {
+          const chartsTop = getTop(chartsRef.current);
+          const chartsHeight = chartsRef.current.getBoundingClientRect().height;
+          const top = Math.max(chartsTop + chartsHeight + 20 - headerOffset, 0);
+          window.scrollTo({ top, behavior: 'smooth' });
+        }
+        break;
+        
+      case 'content':
+        if (contentRef.current) {
+          const top = Math.max(getTop(contentRef.current) - headerOffset, 0);
+          window.scrollTo({ top, behavior: 'smooth' });
+        }
+        break;
+    }
+
+    // Reinforce active state after the smooth scroll settles
+    window.setTimeout(() => setActiveSection(section), 500);
+    window.setTimeout(() => setActiveSection(section), 1000);
+  };
+
+  // Track active section on scroll - improved to avoid misclassification near boundaries
+  React.useEffect(() => {
+    const handleScroll = () => {
+      // If user just clicked a nav button, don't override active state momentarily
+      if (clickActiveLockRef.current) return;
+      const sections = [
+        { name: 'filters', ref: filtersRef },
+        { name: 'tiles', ref: tilesRef },
+        { name: 'charts', ref: chartsRef },
+        { name: 'details', ref: detailsRef },
+        { name: 'content', ref: contentRef }
+      ];
+
+      // Use a marker at 35% of viewport height for stable detection
+      const markerY = window.scrollY + Math.round(window.innerHeight * 0.35);
+      let current = 'filters';
+      let currentTop = -Infinity;
+
+      for (let i = 0; i < sections.length; i++) {
+        const section = sections[i];
+        const el = section.ref.current;
+        if (!el) continue;
+        const top = el.getBoundingClientRect().top + window.scrollY;
+        if (top <= markerY && top > currentTop) {
+          current = section.name;
+          currentTop = top;
+        }
+      }
+
+      setActiveSection(current);
+    };
+
+    // Initial call to set correct section on load
+    handleScroll();
+    
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []); // No dependencies - simple tracking
+
   return (
     <ConfigProvider theme={appTheme}>
       <Layout style={{ minHeight: '100vh' }}>
+        {/* Navigation Component */}
+        <div style={{
+          position: 'fixed',
+          left: '20px',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          zIndex: 1000,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px'
+        }}>
+          {[
+            { key: 'filters', label: 'Filters' },
+            { key: 'tiles', label: 'Tiles' },
+            { key: 'charts', label: 'Charts' },
+            { key: 'details', label: 'Details' },
+            { key: 'content', label: 'Content' }
+          ].map((section) => (
+            <div
+              key={section.key}
+              onClick={() => scrollToSection(section.key)}
+              style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                backgroundColor: activeSection === section.key ? '#1890ff' : '#f5f5f5',
+                color: activeSection === section.key ? '#ffffff' : '#666666',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                fontSize: '10px',
+                fontWeight: 'bold',
+                textAlign: 'center',
+                lineHeight: '1.2',
+                transition: 'all 0.3s ease',
+                border: activeSection === section.key ? '2px solid #1890ff' : '2px solid transparent',
+                boxShadow: activeSection === section.key 
+                  ? '0 2px 8px rgba(24, 144, 255, 0.3)' 
+                  : '0 1px 3px rgba(0, 0, 0, 0.1)',
+                userSelect: 'none'
+              }}
+              onMouseEnter={(e) => {
+                if (activeSection !== section.key) {
+                  e.currentTarget.style.backgroundColor = '#e6f7ff';
+                  e.currentTarget.style.color = '#1890ff';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (activeSection !== section.key) {
+                  e.currentTarget.style.backgroundColor = '#f5f5f5';
+                  e.currentTarget.style.color = '#666666';
+                }
+              }}
+              title={section.label}
+            >
+              {section.label.split('').map((char, index) => (
+                <div key={index} style={{ lineHeight: '1' }}>
+                  {char}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
         <Header style={{ background: 'transparent', padding: 0 }}>
           <div style={{ maxWidth: 1614, margin: '0 auto', padding: '0 12px' }}>
             <Typography.Title level={2} style={{ margin: '24px 0 20px' }}>Dashboard</Typography.Title>
@@ -2618,7 +2789,7 @@ export default function App() {
         </Header>
         <Content>
           <div style={{ maxWidth: 1614, margin: '0 auto', padding: '0 12px' }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18, marginBottom: 20, alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+            <div ref={filtersRef} style={{ display: 'flex', flexWrap: 'wrap', gap: 18, marginBottom: 20, alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
               <Select
                 style={{ minWidth: 320 }}
                 options={companyOptions}
@@ -2712,7 +2883,7 @@ export default function App() {
 
             </div>
 
-            <div style={{
+            <div ref={tilesRef} style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
               gap: 15,
@@ -2742,7 +2913,7 @@ export default function App() {
               })}
             </div>
 
-            <div style={{ position: 'relative' }}>
+            <div ref={chartsRef} style={{ position: 'relative' }}>
               <ChartsBlock dateRange={dateRange} axisType={axisType} />
               <DetailsToggle showDetails={showDetails} setShowDetails={setShowDetails} />
               <SummaryToggle dateRange={dateRange} />
@@ -2758,24 +2929,19 @@ export default function App() {
             </div>
 
             {showDetails && (
-              <div style={{ marginTop: 16 }}>
+              <div ref={detailsRef} style={{ marginTop: 16 }}>
                 <DetailsTable 
                   filters={{ asin: selectedAsin, blogger: selectedBlogger }} 
                   onShowContent={(filter) => {
                     setIndividualFilter(filter);
-                    // Scroll to Content table
-                    setTimeout(() => {
-                      contentTableRef.current?.scrollIntoView({ 
-                        behavior: 'smooth', 
-                        block: 'start' 
-                      });
-                    }, 100);
+                    // Scroll to Content table via unified scroll handler
+                    scrollToSection('content');
                   }}
                 />
               </div>
             )}
 
-            <div ref={contentTableRef} style={{ marginTop: 16 }}>
+            <div ref={contentRef} style={{ marginTop: 16 }}>
               <ContentTableCard
                 filters={{ company: selectedCompany, blogger: selectedBlogger, asin: selectedAsin, link: selectedLink }}
                 dateRange={dateRange}
@@ -3187,27 +3353,35 @@ function DetailsToggle({ showDetails, setShowDetails }: { showDetails: boolean; 
       onClick={() => setShowDetails(!showDetails)}
       style={{ 
         position: 'fixed', 
-        top: 76, 
-        right: 4, 
-        zIndex: 50, 
+        top: 'calc(50vh - 140px)',
+        right: 0,
+        zIndex: 51, 
         border: '1px solid #D9D9D9', 
-        borderRadius: 16, 
-        background: showDetails ? '#1890ff' : '#ffffff', 
-        color: showDetails ? '#ffffff' : '#000000',
-        boxShadow: showDetails 
-          ? 'inset 0 4px 8px rgba(0,0,0,0.3), inset 0 1px 2px rgba(0,0,0,0.2), 0 1px 1px rgba(0,0,0,0.1)' 
-          : '0 1px 2px rgba(0,0,0,0.06)',
-        transform: showDetails ? 'translateY(2px)' : 'translateY(0)',
-        transition: 'all 0.2s ease',
-        width: 40,
-        height: 40,
+        borderRadius: '8px 0 0 8px',
+        background: showDetails ? '#1890ff' : '#f5f5f5', 
+        color: showDetails ? '#ffffff' : '#666666',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+        transition: 'all 0.3s ease',
+        width: 32,
+        height: 120,
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
+        padding: 0,
+        writingMode: 'vertical-rl',
+        textOrientation: 'mixed'
       }}
       aria-label="Toggle details"
     >
-      <InfoCircleOutlined />
+      <span style={{
+        fontSize: '12px',
+        fontWeight: 'bold',
+        letterSpacing: '1px',
+        transform: 'rotate(180deg)',
+        display: 'block'
+      }}>
+        DETAILS
+      </span>
     </Button>
   );
 }
@@ -3232,10 +3406,37 @@ function SummaryToggle({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
     <Button
       type="text"
       onClick={toggle}
-      style={{ position: 'fixed', top: 128, right: open ? 364 : 4, zIndex: 50, border: '1px solid #D9D9D9', borderRadius: 16, background: '#ffffff', boxShadow: '0 1px 2px rgba(0,0,0,0.06)', width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      style={{ 
+        position: 'fixed', 
+        top: 'calc(50vh + 20px)',
+        right: 0,
+        zIndex: 50, 
+        border: '1px solid #D9D9D9', 
+        borderRadius: '8px 0 0 8px',
+        background: open ? '#1890ff' : '#f5f5f5', 
+        color: open ? '#ffffff' : '#666666',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+        transition: 'all 0.3s ease',
+        width: 32,
+        height: 120,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 0,
+        writingMode: 'vertical-rl',
+        textOrientation: 'mixed'
+      }}
       aria-label="Toggle summary"
     >
-      {open ? <RightCircleOutlined /> : <LeftCircleOutlined />}
+      <span style={{
+        fontSize: '12px',
+        fontWeight: 'bold',
+        letterSpacing: '1px',
+        transform: 'rotate(180deg)',
+        display: 'block'
+      }}>
+        SUMMARY
+      </span>
     </Button>
   );
 }
@@ -3289,7 +3490,7 @@ function SummaryPanel({
   const profit = currentMetrics.current.Profit;
 
   return (
-    <div style={{ position: 'fixed', top: 0, right: 0, width: open ? 360 : 0, overflow: 'hidden', transition: 'width 0.2s ease', zIndex: 20, height: '100vh', paddingTop: '120px' }}>
+    <div style={{ position: 'fixed', top: 'calc(50vh + 20px)', right: '32px', width: open ? 360 : 0, overflow: 'hidden', transition: 'width 0.2s ease', zIndex: 20, height: 'fit-content' }}>
       <Card styles={{ body: { padding: open ? 16 : 0, display: open ? 'block' : 'none', height: 'fit-content' } }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <Typography.Text strong>Summary</Typography.Text>
