@@ -8,7 +8,7 @@ import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 import type { MenuProps } from 'antd';
-import { DownOutlined, UpOutlined, InfoCircleOutlined, LeftCircleOutlined, RightCircleOutlined, SettingOutlined, DeleteOutlined, SaveOutlined, PlusCircleOutlined } from '@ant-design/icons';
+import { DownOutlined, UpOutlined, InfoCircleOutlined, LeftCircleOutlined, RightCircleOutlined, SettingOutlined, DeleteOutlined, SaveOutlined, PlusCircleOutlined, DownloadOutlined } from '@ant-design/icons';
 import Chart from 'chart.js/auto';
 // @ts-ignore
 import { CrosshairPlugin } from 'chartjs-plugin-crosshair';
@@ -197,8 +197,8 @@ let asinOptions: { value: string; label: string }[] = [];
 // linkOptions will be generated dynamically from contentRowsBase
 
 // Default metrics (will be calculated after data is defined)
-const prevM = { Spend:1774.18, Clicks:3249, Orders:120, Sales:8065.07, Conversion:'12%', 'Commision Rate':'5%', Profit:3200, 'Promotional Costs': 650.00, 'Total expenses': 2424.18 } as const;
-const curM  = { Spend:3372.42, Clicks:6200, Orders:100, Sales:15450.24, Conversion:'15%', 'Commision Rate':'7%', Profit:5400, 'Promotional Costs': 980.00, 'Total expenses': 4352.42 } as const;
+const prevM = { Spend:1774.18, Clicks:3249, Units:120, Sales:8065.07, Conversion:'12%', 'Commision Rate':'5%', Profit:3200, 'Promotional Costs': 650.00, 'Total expenses': 2424.18 } as const;
+const curM  = { Spend:3372.42, Clicks:6200, Units:100, Sales:15450.24, Conversion:'15%', 'Commision Rate':'7%', Profit:5400, 'Promotional Costs': 980.00, 'Total expenses': 4352.42 } as const;
 const allMetrics = Object.keys(prevM) as Array<keyof typeof prevM>;
 
 function MetricCard({ title, value, prev }: { title: string; value: number|string; prev: number|string }) {
@@ -211,7 +211,7 @@ function MetricCard({ title, value, prev }: { title: string; value: number|strin
     comparison = <div style={{ color, marginTop: 6 }}>{arrow} {Math.abs(diff).toLocaleString('ru-RU', { minimumFractionDigits: 2 })}</div>;
   }
   const display =
-    title === 'Clicks' || title === 'Orders'
+    title === 'Clicks' || title === 'Units'
       ? (value as number).toLocaleString('ru-RU')
       : (typeof value === 'number' ? `$${value.toLocaleString('ru-RU', { minimumFractionDigits: 2 })}` : value);
 
@@ -286,7 +286,7 @@ function ChartCard({ dateRange, collapsed, axisType }: { dateRange: [Dayjs, Dayj
     
     if (checks.spend) addPair('Spend', curM.Spend, '#1f77b4', bothUnits ? yLeftId : yLeftId, 0.2);
     if (checks.profit) addPair('Profit', curM.Profit, '#ff7f0e', bothUnits ? yLeftId : yLeftId, 0.25);
-    if (checks.orders) addPair('Orders', curM.Orders, '#33a02c', bothUnits ? yRightId : yLeftId, 0.3);
+    if (checks.orders) addPair('Units', curM.Units, '#33a02c', bothUnits ? yRightId : yLeftId, 0.3);
     return { datasets, moneySelected, countSelected, bothUnits, yLeftId, yRightId };
   }, [checks]);
 
@@ -405,7 +405,7 @@ function ChartCard({ dateRange, collapsed, axisType }: { dateRange: [Dayjs, Dayj
       key: 'orders',
       label: (
         <Checkbox onClick={e => e.stopPropagation()} checked={checks.orders} onChange={e => { const next = { ...checks, orders: e.target.checked }; if (next.spend || next.profit || next.orders) next.none = false; setChecks(next); }}>
-          Orders
+          Units
         </Checkbox>
       ),
     },
@@ -439,7 +439,7 @@ function ChartCard({ dateRange, collapsed, axisType }: { dateRange: [Dayjs, Dayj
       {!collapsed && (
         <Space style={{ marginBottom: 12 }}>
           <Dropdown menu={{ items: menuItems }} open={dropOpen} onOpenChange={setDropOpen} trigger={["click"]}>
-            <Button>Spend/Profit/Orders <DownOutlined /></Button>
+            <Button>Spend/Profit/Units <DownOutlined /></Button>
           </Dropdown>
         </Space>
       )}
@@ -512,7 +512,7 @@ function SecondaryChart({ dateRange, axisType }: { dateRange: [Dayjs, Dayjs] | n
     };
     
     if (checks.clicks) addPair('Clicks', 200, '#1f77b4', hasPercent && hasCount ? yLeftId : yLeftId, 0.2);
-    if (checks.orders) addPair('Orders', 50, '#33a02c', hasPercent && hasCount ? yLeftId : yLeftId, 0.3);
+    if (checks.orders) addPair('Units', 50, '#33a02c', hasPercent && hasCount ? yLeftId : yLeftId, 0.3);
     if (checks.conversion) addPair('Conversion', 5, '#ff7f0e', hasPercent && hasCount ? yRightId : yLeftId, 0.2, true);
 
     return { datasets, hasPercent, hasCount, yLeftId, yRightId };
@@ -639,7 +639,7 @@ function SecondaryChart({ dateRange, axisType }: { dateRange: [Dayjs, Dayjs] | n
             setChecks(next);
           }}
         >
-          Orders
+          Units
         </Checkbox>
       ),
     },
@@ -680,7 +680,7 @@ function SecondaryChart({ dateRange, axisType }: { dateRange: [Dayjs, Dayjs] | n
     <Card title="Engagement Metrics" style={{ maxWidth: 1600, margin: '0 auto' }}>
       <Space style={{ marginBottom: 12 }}>
         <Dropdown menu={{ items: dropdownItems }} open={dropOpen} onOpenChange={setDropOpen} trigger={["click"]}>
-          <Button>Clicks/Orders/Conversion <DownOutlined /></Button>
+          <Button>Clicks/Units/Conversion <DownOutlined /></Button>
         </Dropdown>
       </Space>
       <canvas ref={canvasRef} />
@@ -786,7 +786,7 @@ function UnifiedChart({
     if (checks.spend) addPair('Spend', 500, '#1890ff', yLeftId, 0.2);
     if (checks.profit) addPair('Profit', 200, '#52c41a', yLeftId, 0.25);
     if (checks.totalExpenses) addPair('Total expenses', 700, '#ff4d4f', yLeftId, 0.2);
-    if (checks.orders) addPair('Orders', 15, '#fa8c16', yRightId, 0.3);
+    if (checks.orders) addPair('Units', 15, '#fa8c16', yRightId, 0.3);
     if (checks.clicks) addPair('Clicks', 100, '#722ed1', yRightId, 0.2);
     if (checks.conversion) addPair('Conversion', 15, '#eb2f96', yPercentId, 0.15, true);
 
@@ -899,7 +899,7 @@ function UnifiedChart({
             position: 'right',
             title: {
               display: true,
-              text: 'Orders & Clicks',
+              text: 'Units & Clicks',
               color: '#666'
             },
             grid: {
@@ -972,7 +972,7 @@ function UnifiedChart({
   const items: MenuProps['items'] = [
     { key: 'spend', label: <Checkbox checked={checks.spend} onChange={e => { e.stopPropagation(); handleMetricChange('spend', e.target.checked); }}>Spend</Checkbox> },
     { key: 'profit', label: <Checkbox checked={checks.profit} onChange={e => { e.stopPropagation(); handleMetricChange('profit', e.target.checked); }}>Profit</Checkbox> },
-    { key: 'orders', label: <Checkbox checked={checks.orders} onChange={e => { e.stopPropagation(); handleMetricChange('orders', e.target.checked); }}>Orders</Checkbox> },
+    { key: 'orders', label: <Checkbox checked={checks.orders} onChange={e => { e.stopPropagation(); handleMetricChange('orders', e.target.checked); }}>Units</Checkbox> },
     { key: 'clicks', label: <Checkbox checked={checks.clicks} onChange={e => { e.stopPropagation(); handleMetricChange('clicks', e.target.checked); }}>Clicks</Checkbox> },
     { key: 'conversion', label: <Checkbox checked={checks.conversion} onChange={e => { e.stopPropagation(); handleMetricChange('conversion', e.target.checked); }}>Conversion</Checkbox> },
     { key: 'totalExpenses', label: <Checkbox checked={checks.totalExpenses} onChange={e => { e.stopPropagation(); handleMetricChange('totalExpenses', e.target.checked); }}>Total expenses</Checkbox> },
@@ -1604,7 +1604,7 @@ function calculateMetrics(
   const currentMetrics = {
     Spend: filteredDetails.reduce((sum, row) => sum + row.spend, 0),
     Clicks: filteredDetails.reduce((sum, row) => sum + row.clicks, 0),
-    Orders: filteredDetails.reduce((sum, row) => sum + row.orders, 0),
+    Units: filteredDetails.reduce((sum, row) => sum + row.orders, 0),
     Sales: filteredDetails.reduce((sum, row) => sum + row.sales, 0),
     Conversion: filteredDetails.length > 0 ? 
       (filteredDetails.reduce((sum, row) => sum + row.orders, 0) / 
@@ -1621,7 +1621,7 @@ function calculateMetrics(
   const previousMetrics = {
     Spend: currentMetrics.Spend * 0.6, // Simulate 40% increase
     Clicks: Math.round(currentMetrics.Clicks * 0.7), // Simulate 30% increase
-    Orders: Math.round(currentMetrics.Orders * 0.8), // Simulate 20% increase
+    Units: Math.round(currentMetrics.Units * 0.8), // Simulate 20% increase
     Sales: currentMetrics.Sales * 0.6, // Simulate 40% increase
     Conversion: currentMetrics.Conversion === '0%' ? '0%' : 
       (parseFloat(currentMetrics.Conversion.replace('%', '')) * 0.8).toFixed(1) + '%',
@@ -1994,6 +1994,33 @@ function TablePresets({
   );
 }
 
+function DetailsTableCard({ filters, onShowContent }: { 
+  filters: { asin?: string; blogger?: string }; 
+  onShowContent: (filter: { type: 'blogger' | 'product'; value: string }) => void;
+}) {
+  const [collapsed, setCollapsed] = React.useState<boolean>(() => {
+    try { return JSON.parse(localStorage.getItem('detailsCollapsed') || 'false'); } catch { return false; }
+  });
+  React.useEffect(() => { localStorage.setItem('detailsCollapsed', JSON.stringify(collapsed)); }, [collapsed]);
+
+  return (
+    <Card
+      title="Details"
+      style={{ maxWidth: 1600, margin: '0 auto' }}
+      styles={{ body: collapsed ? { display: 'none', padding: 0 } : undefined }}
+      extra={
+        <Button type="text" onClick={() => setCollapsed(v => !v)}>
+          {collapsed ? <DownOutlined /> : <UpOutlined />}
+        </Button>
+      }
+    >
+      {!collapsed && (
+        <DetailsTable filters={filters} onShowContent={onShowContent} />
+      )}
+    </Card>
+  );
+}
+
 function DetailsTable({ filters, onShowContent }: { 
   filters: { asin?: string; blogger?: string }; 
   onShowContent: (filter: { type: 'blogger' | 'product'; value: string }) => void;
@@ -2312,7 +2339,7 @@ function DetailsTable({ filters, onShowContent }: {
         }
       },
     },
-    { headerName: 'Orders', field: 'orders', colId: 'orders', flex: 1, minWidth: 80, sortable: true, filter: 'agNumberColumnFilter', hide: columnVisibility['orders'] === false },
+    { headerName: 'Units', field: 'orders', colId: 'orders', flex: 1, minWidth: 80, sortable: true, filter: 'agNumberColumnFilter', hide: columnVisibility['orders'] === false },
     { headerName: 'Clicks', field: 'clicks', colId: 'clicks', flex: 1, minWidth: 80, sortable: true, filter: 'agNumberColumnFilter', hide: columnVisibility['clicks'] === false },
     { headerName: 'Conversion, %', field: 'conversion', colId: 'conversion', flex: 1, minWidth: 100, sortable: true, filter: 'agNumberColumnFilter', hide: columnVisibility['conversion'] === false },
     { headerName: 'Comission Rate, %', field: 'rate', colId: 'rate', flex: 1, minWidth: 120, sortable: true, filter: 'agNumberColumnFilter', hide: columnVisibility['rate'] === false },
@@ -2335,21 +2362,19 @@ function DetailsTable({ filters, onShowContent }: {
 
   return (
     <div>
-      <div style={{ marginBottom: 10, padding: 10, background: '#f0f0f0', borderRadius: 4 }}>
-        <Radio.Group 
-          size="small" 
-          value={viewMode} 
-          onChange={(e) => setViewMode(e.target.value)}
-        >
-          <Radio.Button value="product">Product</Radio.Button>
-          <Radio.Button value="blogger">Blogger</Radio.Button>
-        </Radio.Group>
-      </div>
-      
-
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-          <h4 style={{ margin: 0 }}>Details Table:</h4>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <h4 style={{ margin: 0 }}>Details Table:</h4>
+            <Radio.Group 
+              size="small" 
+              value={viewMode} 
+              onChange={(e) => setViewMode(e.target.value)}
+            >
+              <Radio.Button value="product">Product</Radio.Button>
+              <Radio.Button value="blogger">Blogger</Radio.Button>
+            </Radio.Group>
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '14px', color: '#666' }}>Rows:</span>
@@ -2444,6 +2469,7 @@ export default function App() {
   const [newPresetName, setNewPresetName] = React.useState('');
   const [presetsOpen, setPresetsOpen] = React.useState(false);
   const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const [downloadOpen, setDownloadOpen] = React.useState(false);
   const [dateRange, setDateRange] = React.useState<[Dayjs, Dayjs] | null>(() => {
     try { 
       const saved = localStorage.getItem('dateRange');
@@ -2456,9 +2482,6 @@ export default function App() {
   });
   const [axisType, setAxisType] = React.useState<'day' | 'week' | 'month'>(() => {
     try { return (localStorage.getItem('axisType') as 'day' | 'week' | 'month') || 'day'; } catch { return 'day'; }
-  });
-  const [showDetails, setShowDetails] = React.useState<boolean>(() => {
-    try { return JSON.parse(localStorage.getItem('showDetails') || 'false'); } catch { return false; }
   });
   const [selectedCompany, setSelectedCompany] = React.useState<string | undefined>(() => {
     try { return localStorage.getItem('selectedCompany') || undefined; } catch { return undefined; }
@@ -2506,9 +2529,6 @@ export default function App() {
   }, [axisAvailability, axisType]);
 
   // Save filters state to localStorage
-  React.useEffect(() => {
-    try { localStorage.setItem('showDetails', JSON.stringify(showDetails)); } catch {}
-  }, [showDetails]);
 
   React.useEffect(() => {
     try { 
@@ -2623,9 +2643,12 @@ export default function App() {
     if (clickActiveLockRef.current) {
       window.clearTimeout(clickActiveLockRef.current);
     }
+    // Lock for 2000ms to ensure smooth scroll animation completes
     clickActiveLockRef.current = window.setTimeout(() => {
       clickActiveLockRef.current = null;
-    }, 1200); // lock for duration close to smooth scroll
+      // Final update after lock is released
+      setActiveSection(section);
+    }, 2000);
 
     const headerOffset = 100;
     const getTop = (el: HTMLElement) => el.getBoundingClientRect().top + window.scrollY;
@@ -2670,10 +2693,6 @@ export default function App() {
         }
         break;
     }
-
-    // Reinforce active state after the smooth scroll settles
-    window.setTimeout(() => setActiveSection(section), 500);
-    window.setTimeout(() => setActiveSection(section), 1000);
   };
 
   // Track active section on scroll - improved to avoid misclassification near boundaries
@@ -2789,7 +2808,7 @@ export default function App() {
         </Header>
         <Content>
           <div style={{ maxWidth: 1614, margin: '0 auto', padding: '0 12px' }}>
-            <div ref={filtersRef} style={{ display: 'flex', flexWrap: 'wrap', gap: 18, marginBottom: 20, alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+            <div ref={filtersRef} style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 20, alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
               <Select
                 style={{ minWidth: 320 }}
                 options={companyOptions}
@@ -2881,11 +2900,39 @@ export default function App() {
                 <Button>Tiles Presets <DownOutlined /></Button>
               </Dropdown>
 
+              <Dropdown
+                menu={{
+                  items: [
+                    {
+                      key: 'excel',
+                      label: 'Excel',
+                      onClick: () => {
+                        console.log('Export to Excel');
+                        setDownloadOpen(false);
+                      }
+                    },
+                    {
+                      key: 'csv',
+                      label: '.CSV',
+                      onClick: () => {
+                        console.log('Export to CSV');
+                        setDownloadOpen(false);
+                      }
+                    }
+                  ]
+                }}
+                open={downloadOpen}
+                onOpenChange={setDownloadOpen}
+                trigger={['click']}
+              >
+                <Button icon={<DownloadOutlined />}>Export</Button>
+              </Dropdown>
+
             </div>
 
             <div ref={tilesRef} style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+              gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
               gap: 15,
               maxWidth: 1600,
               margin: '0 auto 24px',
@@ -2915,7 +2962,6 @@ export default function App() {
 
             <div ref={chartsRef} style={{ position: 'relative' }}>
               <ChartsBlock dateRange={dateRange} axisType={axisType} />
-              <DetailsToggle showDetails={showDetails} setShowDetails={setShowDetails} />
               <SummaryToggle dateRange={dateRange} />
               <SummaryPanel 
                 dateRange={dateRange} 
@@ -2928,18 +2974,16 @@ export default function App() {
               />
             </div>
 
-            {showDetails && (
-              <div ref={detailsRef} style={{ marginTop: 16 }}>
-                <DetailsTable 
-                  filters={{ asin: selectedAsin, blogger: selectedBlogger }} 
-                  onShowContent={(filter) => {
-                    setIndividualFilter(filter);
-                    // Scroll to Content table via unified scroll handler
-                    scrollToSection('content');
-                  }}
-                />
-              </div>
-            )}
+            <div ref={detailsRef} style={{ marginTop: 16 }}>
+              <DetailsTableCard 
+                filters={{ asin: selectedAsin, blogger: selectedBlogger }} 
+                onShowContent={(filter) => {
+                  setIndividualFilter(filter);
+                  // Scroll to Content table via unified scroll handler
+                  scrollToSection('content');
+                }}
+              />
+            </div>
 
             <div ref={contentRef} style={{ marginTop: 16 }}>
               <ContentTableCard
@@ -3346,45 +3390,6 @@ function ContentTableCard({
     </Card>
   );
 }
-function DetailsToggle({ showDetails, setShowDetails }: { showDetails: boolean; setShowDetails: (value: boolean) => void }) {
-  return (
-    <Button
-      type="text"
-      onClick={() => setShowDetails(!showDetails)}
-      style={{ 
-        position: 'fixed', 
-        top: 'calc(50vh - 140px)',
-        right: 0,
-        zIndex: 51, 
-        border: '1px solid #D9D9D9', 
-        borderRadius: '8px 0 0 8px',
-        background: showDetails ? '#1890ff' : '#f5f5f5', 
-        color: showDetails ? '#ffffff' : '#666666',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-        transition: 'all 0.3s ease',
-        width: 32,
-        height: 120,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 0,
-        writingMode: 'vertical-rl',
-        textOrientation: 'mixed'
-      }}
-      aria-label="Toggle details"
-    >
-      <span style={{
-        fontSize: '12px',
-        fontWeight: 'bold',
-        letterSpacing: '1px',
-        transform: 'rotate(180deg)',
-        display: 'block'
-      }}>
-        DETAILS
-      </span>
-    </Button>
-  );
-}
 
 function SummaryToggle({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
   const [open, setOpen] = React.useState<boolean>(() => {
@@ -3408,7 +3413,7 @@ function SummaryToggle({ dateRange }: { dateRange: [Dayjs, Dayjs] | null }) {
       onClick={toggle}
       style={{ 
         position: 'fixed', 
-        top: 'calc(50vh + 20px)',
+        top: 'calc(50vh - 60px)',
         right: 0,
         zIndex: 50, 
         border: '1px solid #D9D9D9', 
@@ -3476,7 +3481,7 @@ function SummaryPanel({
   // Calculate metrics based on current filters
   const currentMetrics = calculateMetrics(filters, dateRange);
   const sales = currentMetrics.current.Sales;
-  const units = currentMetrics.current.Orders; // using Orders as Units for demo
+  const units = currentMetrics.current.Units; // using Units for demo
   const clicks = currentMetrics.current.Clicks;
   const conversion = parseFloat(String(currentMetrics.current.Conversion).replace('%', ''));
   const promoCost = (currentMetrics.current as any)['Promotional Costs'] ?? Math.round(currentMetrics.current.Spend * 0.25 * 100) / 100;
@@ -3488,9 +3493,10 @@ function SummaryPanel({
   const holdsPerc = 5; // demo
   const holdsUsd = sales * (holdsPerc / 100);
   const profit = currentMetrics.current.Profit;
+  const totalExpenses = (currentMetrics.current as any)['Total expenses'] ?? 0;
 
   return (
-    <div style={{ position: 'fixed', top: 'calc(50vh + 20px)', right: '32px', width: open ? 360 : 0, overflow: 'hidden', transition: 'width 0.2s ease', zIndex: 20, height: 'fit-content' }}>
+    <div style={{ position: 'fixed', top: 'calc(50vh - 60px)', right: '32px', width: open ? 360 : 0, overflow: 'hidden', transition: 'width 0.2s ease', zIndex: 20, height: 'fit-content' }}>
       <Card styles={{ body: { padding: open ? 16 : 0, display: open ? 'block' : 'none', height: 'fit-content' } }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <Typography.Text strong>Summary</Typography.Text>
@@ -3499,11 +3505,12 @@ function SummaryPanel({
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', rowGap: 6 }}>
           <RowLine label="Sales" value={`${fmtCurrency(sales)}`} />
           <RowLine label="Units" value={`${units}`} />
-          <RowLine label="Promotional costs" value={`${fmtCurrency(promoCost)} / ${fmtPercent(promoPerc)}`} />
-          <RowLine label="Comission rate" value={`${fmtCurrency(commissionUsd)} / ${fmtPercent(commissionPerc)}`} />
-          <RowLine label="Cost price" value={`${fmtCurrency(costUsd)} / ${fmtPercent(costPerc)}`} />
-          <RowLine label="Amazon Holds" value={`${fmtCurrency(holdsUsd)} / ${fmtPercent(holdsPerc)}`} />
           <RowLine label="Profit" value={`${fmtCurrency(profit)}`} />
+          <RowLine label="Total expenses" value={`${fmtCurrency(totalExpenses)}`} />
+          <RowLine label="Promotional costs" value={`${fmtCurrency(promoCost)} / ${fmtPercent(promoPerc)}`} />
+          <RowLine label="Amazon fee" value={`${fmtCurrency(holdsUsd)} / ${fmtPercent(holdsPerc)}`} />
+          <RowLine label="Cost price" value={`${fmtCurrency(costUsd)} / ${fmtPercent(costPerc)}`} />
+          <RowLine label="Comission rate" value={`${fmtCurrency(commissionUsd)} / ${fmtPercent(commissionPerc)}`} />
           <RowLine label="Clicks" value={`${clicks}`} />
           <RowLine label="Conversion" value={`${fmtPercent(conversion)}`} />
         </div>
